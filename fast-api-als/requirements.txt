@@ -1,0 +1,4 @@
+pandas
+sagemaker
+boto3
+fast-api
