@@ -1,29 +1,20 @@
 import json
 import boto3
-import re
 import sagemaker
 import pandas as pd
 import io
-from io import StringIO
+import os
+import time
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
+from fastapi import FastAPI
+from boto3 import Session
 
-sagemaker_client = boto3.Session().client('sagemaker')
+ALS_AWS_SECRET_KEY = os.getenv("ALS_AWS_SECRET_KEY")
+ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
 
-# runtime = boto3.client('runtime.sagemaker')
-
-container_name = 'xgboost'
-endpoint_name = "LS-HYU-2017-als-1-087-a7f1301b-2022-02-21-06-07-55-150"
-predictor = sagemaker.predictor.Predictor(
-    endpoint_name,
-    # sagemaker_session=None,
-    #     serializer=CSVSerializer,
-    #     deserializer=JSONSerializer
-    # accept=None
-)
-predictor.serializer = CSVSerializer()
-predictor.deserializer = JSONDeserializer()
+app = FastAPI()
 
 dummy_data = [[5.33023135e+00, 1.00000000e+00, 0.00000000e+00, 3.00000000e+00,
                0.00000000e+00, 3.60890000e+04, 4.61015488e+03, 0.00000000e+00,
@@ -77,57 +68,77 @@ dummy_data = [[5.33023135e+00, 1.00000000e+00, 0.00000000e+00, 3.00000000e+00,
                0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
                0.00000000e+00, 1.00000000e+00]]
 
+endpoint_name = os.getenv('ENDPOINT_NAME')
+container_name = 'xgboost'
+endpoint_name = "LS-HYU-2017-als-1-087-a7f1301b-2022-02-21-06-07-55-150"
+runtime = boto3.client(
+    'runtime.sagemaker',
+    aws_access_key_id=os.getenv("ALS_AWS_ACCESS_KEY"),
+    aws_secret_access_key=os.getenv("ALS_AWS_SECRET_KEY"),
+    region_name='us-east-1'
+)
 
-def lambda_handler(event, context):
-    # TODO implement
+
+def get_sagemaker_client():
+    session = Session(
+        aws_access_key_id=os.getenv("ALS_AWS_ACCESS_KEY"),
+        aws_secret_access_key=os.getenv("ALS_AWS_SECRET_KEY"),
+        region_name='us-east-1'
+    )
+    return session
+
+
+def get_predictor(sagemaker_client):
+    predictor = sagemaker.predictor.Predictor(
+        endpoint_name,
+        sagemaker_session=sagemaker.session.Session(sagemaker_client)
+    )
+    predictor.serializer = CSVSerializer()
+    predictor.deserializer = JSONDeserializer()
+    return predictor
+
+
+sagemaker_client = get_sagemaker_client()
+predictor = get_predictor(sagemaker_client)
+
+
+def get_prediction():
     result = predictor.predict(dummy_data, initial_args={'ContentType': 'text/csv'})
-    # df = pd.DataFrame(dummy_data)
-    # csv_file = io.StringIO()
-    # # by default sagemaker expects comma seperated
-    # df_1_record.to_csv(csv_file, sep=",", header=False, index=False)
-    # my_payload_as_csv = csv_file.getvalue()
-    # result = runtime.invoke_endpoint(EndpointName=endpoint_name,
-    #                                  ContentType='text/csv',
-    #                                  Body=my_payload_as_csv)
-    if container_name == 'linear-learner':
-        print(result['predictions'][0]['score'])
-    elif container_name == 'xgboost':
-        print(result)
-
-    return {
-        'statusCode': 200,
-        'body': json.dumps(f'Hello from Lambda! {result}')
-    }
+    return result
 
 
-from fastapi import FastAPI
-
-app = FastAPI()
-
-
-@app.get("/")
+@app.get("/ping")
 def read_root():
-    return {"Hello": "World"}
+    start = time.process_time()
+    time_taken = (time.process_time() - start) * 1000
+    return {f"Pong with response time {time_taken} ms"}
 
 
 @app.get("/predict/")
-def read_item():
-    result = predictor.predict(dummy_data, initial_args={'ContentType': 'text/csv'})
-    # df = pd.DataFrame(dummy_data)
-    # csv_file = io.StringIO()
-    # # by default sagemaker expects comma seperated
-    # df_1_record.to_csv(csv_file, sep=",", header=False, index=False)
-    # my_payload_as_csv = csv_file.getvalue()
-    # result = runtime.invoke_endpoint(EndpointName=endpoint_name,
-    #                                  ContentType='text/csv',
-    #                                  Body=my_payload_as_csv)
-    if container_name == 'linear-learner':
-        print(result['predictions'][0]['score'])
-    elif container_name == 'xgboost':
-        print(result)
+def predict():
+    start = time.process_time()
+    result = get_prediction()
+    time_taken = (time.process_time() - start) * 1000
+    if result > 0.033:
+        return {f"ACCEPTED: {result} with model response Time : {time_taken} ms"}
+    else:
+        return {f"REJECTED: {result} with model response Time : {time_taken} ms"}
 
-    # return {
-    #     'statusCode': 200,
-    #     'body': json.dumps(f'Hello from Lambda! {result}')
-    # }
-    return {f"Done {result}"}
+
+@app.get("/predict1/")
+def predict1():
+    csv_file = io.StringIO()
+    # by default sagemaker expects comma separated
+    df = pd.DataFrame(dummy_data)
+    df.to_csv(csv_file, sep=",", header=False, index=False)
+    my_payload_as_csv = csv_file.getvalue()
+    start = time.process_time()
+    response = runtime.invoke_endpoint(EndpointName=endpoint_name,
+                                       ContentType='text/csv',
+                                       Body=my_payload_as_csv)
+    result = json.loads(response['Body'].read().decode())
+    time_taken = (time.process_time() - start) * 1000
+    if result > 0.033:
+        return {f"ACCEPTED: {result} with model response Time : {time_taken} ms"}
+    else:
+        return {f"REJECTED: {result} with model response Time : {time_taken} ms"}
