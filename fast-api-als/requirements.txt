@@ -1,4 +1,5 @@
 pandas
 sagemaker
 boto3
-fast-api
+fastapi==0.70.1
+uvicorn==0.15.0
