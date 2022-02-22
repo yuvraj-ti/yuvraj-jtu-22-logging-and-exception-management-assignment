@@ -6,6 +6,9 @@ import io
 import os
 import time
 import logging
+import pgeocode
+from dateutil import parser
+import calendar
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
@@ -115,11 +118,71 @@ def get_prediction():
     result = predictor.predict(dummy_data, initial_args={'ContentType': 'text/csv'})
     return result
 
+def get_dealer_postal_code(dealer_code):
+    # TODO: Implement this function
+    return "85251"
+
+def get_distance_to_vendor(dealer_code, customer_postal_code):
+    dealer_postal_code = get_dealer_postal_code(dealer_code)
+    dist = pgeocode.GeoDistance('US')
+    # distance in km
+    return dist.query_postal_code(dealer_postal_code, customer_postal_code)
 
 def get_ml_input_json(input):
+    """
+    TODO: Determine FirstLastPropCase, lead_TimeFrameCont, EmailDomainCat, Vehicle_FinanceMethod, BroadColour,
+    """
+    request_datetime = parser.parse(input['adf']['prospect']['requestdate'])
     return {
-
+        "DistanctToVendor": get_distance_to_vendor(input['adf']['prospect']['vendor']['id']['#text'],
+                                                   input['adf']['prospect']['customer']['contact']['address']['postalcode']),
+        "FirstLastPropCase": 0,
+        "NameEmailCheck": 1,
+        "SingleHour": request_datetime.hour,
+        "SingleWeekday": calendar.day_name[request_datetime.weekday()],
+        "Transmission": input['adf']['prospect']['vehicle']['transmission'],
+        "Model": input['adf']['prospect']['vehicle']['model'],
+        "lead_TimeFrameCont": "Codenation",
+        "EmailDomainCat": "high",
+        "BroadColour": input['adf']['prospect']['vehicle']['colorcombination']['exteriorcolor'],
+        "PriceStart": input['adf']['prospect']['vehicle']['price'][0]['#text']
     }
+"""
+DistanctToVendor                      0.424685
+FirstLastPropCase                            0
+NameEmailCheck                               1
+SingleHour                                   3
+SingleWeekday                         saturday
+lead_TimeFrameCont                  Codenation
+EmailDomainCat                            high
+Vehicle_FinanceMethod                  unknown
+BroadColour                         Codenation
+ColoursNotChosen                             0
+Gender                                       m
+Income                                   83687
+ZipPopulationDensity                   4556.36
+ZipPopulationDensity_AverageUsed             0
+CountryOfOrigin                          asian
+AddressProvided                              1
+TelephonePreference                 Codenation
+AddressContainsNumericAndText                1
+Segment_Description                 midsizecar
+PriceStart                               20895
+Cylinders                              unknown
+Hybrid                                       0
+Transmission                           unknown
+Displacement                           under3l
+lead_ProviderService                Codenation
+LeadConverted                                0
+Period                                  201702
+Model                               Codenation
+Lead_Source                         Codenation
+Rating                                     4.6
+LifeTimeReviews                             79
+Recommended                                 93
+SCR                                    5.34849
+OCR                                    8.91899
+"""
 
 
 @app.get("/ping")
@@ -155,7 +218,7 @@ async def predict(file: Request):
             "message": validation_message
         }
 
-    model_input = get_ml_input_json(json.dumps(obj))
+    model_input = get_ml_input_json(obj)
 
     result = get_prediction()
     time_taken = (time.process_time() - start) * 1000
