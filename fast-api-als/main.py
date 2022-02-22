@@ -5,11 +5,20 @@ import pandas as pd
 import io
 import os
 import time
+import logging
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from boto3 import Session
+
+from utils.adf import parse_xml, check_validation
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)0.8s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 ALS_AWS_SECRET_KEY = os.getenv("ALS_AWS_SECRET_KEY")
 ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
@@ -107,6 +116,12 @@ def get_prediction():
     return result
 
 
+def get_ml_input_json(input):
+    return {
+
+    }
+
+
 @app.get("/ping")
 def read_root():
     start = time.process_time()
@@ -114,9 +129,34 @@ def read_root():
     return {f"Pong with response time {time_taken} ms"}
 
 
-@app.get("/predict/")
-def predict():
+@app.post("/predict/")
+async def predict(file: Request):
     start = time.process_time()
+    body = await file.body()
+    body = str(body, 'utf-8')
+
+    obj = parse_xml(body)
+
+    if not obj:
+        return {
+            "status": "REJECTED",
+            "code": "1_INVALID_XML",
+            "message": "Error occured while parsing XML"
+        }
+
+    validation_check, validation_message = check_validation(obj)
+
+    logger.info(f"validation message: {validation_message}")
+
+    if not validation_check:
+        return {
+            "status": "REJECTED",
+            "code": "6_MISSING_FIELD",
+            "message": validation_message
+        }
+
+    model_input = get_ml_input_json(json.dumps(obj))
+
     result = get_prediction()
     time_taken = (time.process_time() - start) * 1000
     if result > 0.033:
