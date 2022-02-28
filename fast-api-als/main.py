@@ -115,12 +115,83 @@ predictor = get_predictor(sagemaker_client)
 
 
 def get_prediction():
+    return 0.235
     result = predictor.predict(dummy_data, initial_args={'ContentType': 'text/csv'})
     return result
+
 
 def get_dealer_postal_code(dealer_code):
     # TODO: Implement this function
     return "85251"
+
+
+def get_broad_color(color):
+    if color in ('Silver', 'Steel', 'Platinum'):
+        return 'SILVER'
+    elif color in ('Monaco White'):
+        return 'WHITE'
+    elif color in ('Green'):
+        return 'GREEN'
+    return 'UNKNOWN'
+
+
+def get_country_of_origin(country):
+    if not country:
+        return 'UNKNOWN'
+    if country == 'US':
+        return 'USA'
+    if country in ('IN', 'IL', 'TR', 'AE'):
+        return 'ASIAN'
+    return 'USA'
+
+
+def get_color_not_chosen_value(interior, exterior):
+    if not interior or not exterior or interior in ('Unknown', 'NoPreference', 'Default', 'undecided', 'Invalid',
+                                                    'No Preferences', 'N A', 'N/A', 'No Preference', '-1') \
+            or \
+            exterior in ('Unknown', 'NoPreference', 'Default', 'undecided', 'Invalid', 'No Preferences', 'N A', 'N/A',
+                         'No Preference', '-1'):
+        return 1
+    return 0
+
+
+def check_telephone_preference(preference):
+    if preference == '':
+        return 'UNKNOWN'
+    return preference
+
+
+def check_alpha_and_numeric_address(address):
+    numeric = any(map(str.isdigit, address))
+    alpha = False
+    for c in address:
+        if ('a' <= c <= 'z') or ('A' <= c <= 'Z'):
+            alpha = True
+    return numeric and alpha
+
+
+def get_cylinder(trim):
+    if 'V8' in trim:
+        return 'V8'
+    elif 'V6' in trim:
+        return 'V6'
+    return 'UNKNOWN'
+
+
+def get_transmission(trim):
+    if 'Manual' in trim or 'man' in trim:
+        return 'MANUAL'
+    elif 'Automatic' in trim or 'auto' in trim:
+        return 'Automatic'
+    return 'UNKNOWN'
+
+
+def get_price_start(price_list):
+    price = '0'
+    for prices in price_list:
+        price = max(price, prices['#text'])
+    return price
+
 
 def get_distance_to_vendor(dealer_code, customer_postal_code):
     dealer_postal_code = get_dealer_postal_code(dealer_code)
@@ -128,25 +199,65 @@ def get_distance_to_vendor(dealer_code, customer_postal_code):
     # distance in km
     return dist.query_postal_code(dealer_postal_code, customer_postal_code)
 
-def get_ml_input_json(input):
-    """
-    TODO: Determine FirstLastPropCase, lead_TimeFrameCont, EmailDomainCat, Vehicle_FinanceMethod, BroadColour,
-    """
-    request_datetime = parser.parse(input['adf']['prospect']['requestdate'])
+
+def get_ml_input_json(adf_json):
+    distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect']['vendor'].get('id', {}).get('#text', None),
+                                                adf_json['adf']['prospect']['customer']['contact']['address']['postalcode'])
+
+    request_datetime = parser.parse(adf_json['adf']['prospect']['requestdate'])
+    broad_color = get_broad_color(
+        adf_json['adf']['prospect']['vehicle'].get('colorcombination', {}).get('exteriorcolor', None))
+    color_not_chosen = get_color_not_chosen_value(
+        adf_json['adf']['prospect']['vehicle'].get('colorcombination', {}).get('interiorcolor', None),
+        adf_json['adf']['prospect']['vehicle'].get('colorcombination', {}).get('exteriorcolor', None))
+    country_of_origin = get_country_of_origin(
+        adf_json['adf']['prospect']['customer']['contact']['address'].get('country', None))
+    telephone_preference = check_telephone_preference(
+        adf_json['adf']['prospect']['customer']['contact'].get('phone', {}).get('@time', ''))
+    street_address = adf_json['adf']['prospect']['customer']['contact']['address'].get('street', {}).get('#text', None)
+    address_check = check_alpha_and_numeric_address(street_address)
+    trim = adf_json['adf']['prospect']['vehicle'].get('trim', '')
+    cylinders = get_cylinder(trim)
+    transmission = get_transmission(trim)
+    price_start = get_price_start(adf_json['adf']['prospect']['vehicle'].get('price', []))
     return {
-        "DistanctToVendor": get_distance_to_vendor(input['adf']['prospect']['vendor']['id']['#text'],
-                                                   input['adf']['prospect']['customer']['contact']['address']['postalcode']),
+        "DistanctToVendor": distance_to_vendor,
         "FirstLastPropCase": 0,
         "NameEmailCheck": 1,
         "SingleHour": request_datetime.hour,
         "SingleWeekday": calendar.day_name[request_datetime.weekday()],
-        "Transmission": input['adf']['prospect']['vehicle']['transmission'],
-        "Model": input['adf']['prospect']['vehicle']['model'],
-        "lead_TimeFrameCont": "Codenation",
-        "EmailDomainCat": "high",
-        "BroadColour": input['adf']['prospect']['vehicle']['colorcombination']['exteriorcolor'],
-        "PriceStart": input['adf']['prospect']['vehicle']['price'][0]['#text']
+        "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description', 'UNKNOWN'),
+        "EmailDomainCat": "TBD",
+        "Vehicle_FinanceMethod": adf_json['adf']['prospect']['vehicle'].get("finance", {}).get("method", "unknown"),
+        "BroadColour": broad_color,
+        "ColoursNotChosen": color_not_chosen,
+        "Gender": "UNKNOWN",
+        "Income": "UNKNOWN",
+        "ZipPopulationDensity": "UNKNOWN",
+        "ZipPopulationDensity_AverageUsed": "UNKNOWN",
+        "CountryOfOrigin": country_of_origin,
+        "AddressProvided": 1 if street_address else 0,
+        "TelephonePreference": telephone_preference,
+        "AddressContainsNumericAndText": address_check,
+        "Segment_Description": "UNKNOWN",
+        "PriceStart": price_start,
+        "Cylinders": cylinders,
+        "Hybrid": 1 if 'Hybrid' in trim else 0,
+        "Transmission": transmission,
+        "Displacement": "under3l",
+        "lead_ProviderService": adf_json['adf']['prospect'].get('provider', {}).get('service', 'UNKNOWN'),
+        'LeadConverted': 0,
+        'Period': str(request_datetime.year) + '-' + str(request_datetime.month),
+        "Model": adf_json['adf']['prospect']['vehicle']['model'],
+        "Lead_Source": "UNKNOWN",
+        "Rating": "UNKNOWN",
+        "LifeTimeReviews": "UNKNOWN",
+        "Recommended": "UNKNOWN",
+        "SCR": "UNKNOWN",
+        "OCR": "UNKNOWN"
     }
+
+
 """
 DistanctToVendor                      0.424685
 FirstLastPropCase                            0
@@ -219,7 +330,7 @@ async def predict(file: Request):
         }
 
     model_input = get_ml_input_json(obj)
-
+    logger.info(model_input)
     result = get_prediction()
     time_taken = (time.process_time() - start) * 1000
     if result > 0.033:
