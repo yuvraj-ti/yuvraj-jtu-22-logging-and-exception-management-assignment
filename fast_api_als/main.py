@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request
 from boto3 import Session
 
 from fast_api_als.utils.adf import parse_xml, check_validation
+from fast_api_als.utils.prep_data import conversion_to_ml_input
 
 logging.basicConfig(
     level=logging.INFO,
@@ -113,9 +114,8 @@ sagemaker_client = get_sagemaker_client()
 predictor = get_predictor(sagemaker_client)
 
 
-def get_prediction():
-    return 0.235
-    result = predictor.predict(dummy_data, initial_args={'ContentType': 'text/csv'})
+def get_prediction(ml_input):
+    result = predictor.predict(ml_input, initial_args={'ContentType': 'text/csv'})
     return result
 
 
@@ -126,22 +126,22 @@ def get_dealer_postal_code(dealer_code):
 
 def get_broad_color(color):
     if color in ('Silver', 'Steel', 'Platinum'):
-        return 'SILVER'
+        return 'silver'
     elif color in ('Monaco White'):
-        return 'WHITE'
+        return 'white'
     elif color in ('Green'):
-        return 'GREEN'
-    return 'UNKNOWN'
+        return 'green'
+    return 'unknown'
 
 
 def get_country_of_origin(country):
     if not country:
-        return 'UNKNOWN'
+        return 'unknown'
     if country == 'US':
-        return 'USA'
+        return 'usa'
     if country in ('IN', 'IL', 'TR', 'AE'):
-        return 'ASIAN'
-    return 'USA'
+        return 'asian'
+    return 'unknown'
 
 
 def get_color_not_chosen_value(interior, exterior):
@@ -156,7 +156,7 @@ def get_color_not_chosen_value(interior, exterior):
 
 def check_telephone_preference(preference):
     if preference == '':
-        return 'UNKNOWN'
+        return 'unknown'
     return preference
 
 
@@ -166,23 +166,25 @@ def check_alpha_and_numeric_address(address):
     for c in address:
         if ('a' <= c <= 'z') or ('A' <= c <= 'Z'):
             alpha = True
-    return numeric and alpha
+    if numeric and alpha:
+        return 1
+    return 0
 
 
 def get_cylinder(trim):
     if 'V8' in trim:
-        return 'V8'
+        return 'v8'
     elif 'V6' in trim:
-        return 'V6'
-    return 'UNKNOWN'
+        return 'v6'
+    return 'unknown'
 
 
 def get_transmission(trim):
     if 'Manual' in trim or 'man' in trim:
-        return 'MANUAL'
+        return 'manual'
     elif 'Automatic' in trim or 'auto' in trim:
-        return 'Automatic'
-    return 'UNKNOWN'
+        return 'automatic'
+    return 'unknown'
 
 
 def get_price_start(price_list):
@@ -225,7 +227,7 @@ def get_ml_input_json(adf_json):
         "NameEmailCheck": 1,
         "SingleHour": request_datetime.hour,
         "SingleWeekday": calendar.day_name[request_datetime.weekday()],
-        "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description', 'UNKNOWN'),
+        "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description', 'unknown'),
         "EmailDomainCat": "normal",
         "Vehicle_FinanceMethod": adf_json['adf']['prospect']['vehicle'].get("finance", {}).get("method", "unknown"),
         "BroadColour": broad_color,
@@ -302,8 +304,8 @@ def read_root():
     return {f"Pong with response time {time_taken} ms"}
 
 
-@app.post("/predict/")
-async def predict(file: Request):
+@app.post("/submit/")
+async def submit(file: Request):
     start = time.process_time()
     body = await file.body()
     body = str(body, 'utf-8')
@@ -330,12 +332,19 @@ async def predict(file: Request):
 
     model_input = get_ml_input_json(obj)
     logger.info(model_input)
-    result = get_prediction()
+    ml_input = conversion_to_ml_input(model_input)
+    logger.info(ml_input)
+    result = get_prediction(ml_input)
     time_taken = (time.process_time() - start) * 1000
-    if result > 0.033:
-        return {f"ACCEPTED: {result} with model response Time : {time_taken} ms"}
+    response_body = {}
+    if result > 0.083:
+        response_body["status"] = "ACCEPTED"
+        response_body["code"] = "0_ACCEPTED"
     else:
-        return {f"REJECTED: {result} with model response Time : {time_taken} ms"}
+        response_body["status"] = "REJECTED"
+        response_body["code"] = "16_LOW_SCORE"
+    response_body["message"] = f" {result} Response Time : {time_taken} ms"
+    return response_body
 
 
 @app.post("/parse/")
@@ -369,7 +378,7 @@ async def predict(file: Request):
     return model_input
 
 
-@app.get("/predict1/")
+@app.post("/predict1/")
 def predict1():
     csv_file = io.StringIO()
     # by default sagemaker expects comma separated
@@ -382,7 +391,12 @@ def predict1():
                                        Body=my_payload_as_csv)
     result = json.loads(response['Body'].read().decode())
     time_taken = (time.process_time() - start) * 1000
+    response_body = {}
     if result > 0.033:
-        return {f"ACCEPTED: {result} with model response Time : {time_taken} ms"}
+        response_body["status"] = "ACCEPTED"
+        response_body["code"] = "0_ACCEPTED"
     else:
-        return {f"REJECTED: {result} with model response Time : {time_taken} ms"}
+        response_body["status"] = "REJECTED"
+        response_body["code"] = "16_LOW_SCORE"
+    response_body["message"] = f" Response Time : {time_taken} ms"
+    return response_body
