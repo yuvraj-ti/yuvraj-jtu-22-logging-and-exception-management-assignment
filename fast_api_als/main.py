@@ -15,7 +15,7 @@ from sagemaker.deserializers import JSONDeserializer
 from fastapi import FastAPI, Request
 from boto3 import Session
 
-from utils import parse_xml, check_validation
+from fast_api_als.utils.adf import parse_xml, check_validation
 
 logging.basicConfig(
     level=logging.INFO,
