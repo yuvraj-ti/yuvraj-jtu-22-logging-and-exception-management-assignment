@@ -15,7 +15,7 @@ from sagemaker.deserializers import JSONDeserializer
 from fastapi import FastAPI, Request
 from boto3 import Session
 
-from utils.adf import parse_xml, check_validation
+from utils import parse_xml, check_validation
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,7 +82,6 @@ dummy_data = [[5.33023135e+00, 1.00000000e+00, 0.00000000e+00, 3.00000000e+00,
 
 endpoint_name = os.getenv('ENDPOINT_NAME')
 container_name = 'xgboost'
-endpoint_name = "LS-HYU-2017-als-1-087-a7f1301b-2022-02-21-06-07-55-150"
 runtime = boto3.client(
     'runtime.sagemaker',
     aws_access_key_id=os.getenv("ALS_AWS_ACCESS_KEY"),
@@ -227,34 +226,34 @@ def get_ml_input_json(adf_json):
         "SingleHour": request_datetime.hour,
         "SingleWeekday": calendar.day_name[request_datetime.weekday()],
         "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description', 'UNKNOWN'),
-        "EmailDomainCat": "TBD",
+        "EmailDomainCat": "normal",
         "Vehicle_FinanceMethod": adf_json['adf']['prospect']['vehicle'].get("finance", {}).get("method", "unknown"),
         "BroadColour": broad_color,
         "ColoursNotChosen": color_not_chosen,
-        "Gender": "UNKNOWN",
-        "Income": "UNKNOWN",
-        "ZipPopulationDensity": "UNKNOWN",
-        "ZipPopulationDensity_AverageUsed": "UNKNOWN",
+        "Gender": "?",
+        "Income": "55319.38839868469",
+        "ZipPopulationDensity": "3585.807443350386",
+        "ZipPopulationDensity_AverageUsed": "0",
         "CountryOfOrigin": country_of_origin,
         "AddressProvided": 1 if street_address else 0,
         "TelephonePreference": telephone_preference,
         "AddressContainsNumericAndText": address_check,
-        "Segment_Description": "UNKNOWN",
+        "Segment_Description": "unknown",
         "PriceStart": price_start,
         "Cylinders": cylinders,
         "Hybrid": 1 if 'Hybrid' in trim else 0,
         "Transmission": transmission,
         "Displacement": "under3l",
-        "lead_ProviderService": adf_json['adf']['prospect'].get('provider', {}).get('service', 'UNKNOWN'),
+        "lead_ProviderService": adf_json['adf']['prospect'].get('provider', {}).get('service', 'autobytel  - trilogy smartleads'),
         'LeadConverted': 0,
         'Period': str(request_datetime.year) + '-' + str(request_datetime.month),
         "Model": adf_json['adf']['prospect']['vehicle']['model'],
-        "Lead_Source": "UNKNOWN",
-        "Rating": "UNKNOWN",
-        "LifeTimeReviews": "UNKNOWN",
-        "Recommended": "UNKNOWN",
-        "SCR": "UNKNOWN",
-        "OCR": "UNKNOWN"
+        "Lead_Source": "hyundaiusa",
+        "Rating": "4.678555302965422",
+        "LifeTimeReviews": "228.7548938307518",
+        "Recommended": "95.71456599706488",
+        "SCR": "5.348490632243166",
+        "OCR": "8.918993057558286"
     }
 
 
@@ -337,6 +336,37 @@ async def predict(file: Request):
         return {f"ACCEPTED: {result} with model response Time : {time_taken} ms"}
     else:
         return {f"REJECTED: {result} with model response Time : {time_taken} ms"}
+
+
+@app.post("/parse/")
+async def predict(file: Request):
+    start = time.process_time()
+    body = await file.body()
+    body = str(body, 'utf-8')
+
+    obj = parse_xml(body)
+
+    if not obj:
+        return {
+            "status": "REJECTED",
+            "code": "1_INVALID_XML",
+            "message": "Error occured while parsing XML"
+        }
+
+    validation_check, validation_message = check_validation(obj)
+
+    logger.info(f"validation message: {validation_message}")
+
+    if not validation_check:
+        return {
+            "status": "REJECTED",
+            "code": "6_MISSING_FIELD",
+            "message": validation_message
+        }
+
+    model_input = get_ml_input_json(obj)
+    logger.info(model_input)
+    return model_input
 
 
 @app.get("/predict1/")
