@@ -194,16 +194,24 @@ def get_price_start(price_list):
     return price
 
 
+def is_nan(x):
+    return x != x
+
+
 def get_distance_to_vendor(dealer_code, customer_postal_code):
     dealer_postal_code = get_dealer_postal_code(dealer_code)
     dist = pgeocode.GeoDistance('US')
     # distance in km
-    return dist.query_postal_code(dealer_postal_code, customer_postal_code)
+    val = dist.query_postal_code(dealer_postal_code, customer_postal_code)
+    if is_nan(val):
+        return 5000  # if nan then set to max default
+    return val
 
 
 def get_ml_input_json(adf_json):
     distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect']['vendor'].get('id', {}).get('#text', None),
-                                                adf_json['adf']['prospect']['customer']['contact']['address']['postalcode'])
+                                                adf_json['adf']['prospect']['customer']['contact']['address'][
+                                                    'postalcode'])
 
     request_datetime = parser.parse(adf_json['adf']['prospect']['requestdate'])
     broad_color = get_broad_color(
@@ -227,7 +235,8 @@ def get_ml_input_json(adf_json):
         "NameEmailCheck": 1,
         "SingleHour": request_datetime.hour,
         "SingleWeekday": calendar.day_name[request_datetime.weekday()],
-        "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description', 'unknown'),
+        "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description',
+                                                                                               'unknown'),
         "EmailDomainCat": "normal",
         "Vehicle_FinanceMethod": adf_json['adf']['prospect']['vehicle'].get("finance", {}).get("method", "unknown"),
         "BroadColour": broad_color,
@@ -246,7 +255,8 @@ def get_ml_input_json(adf_json):
         "Hybrid": 1 if 'Hybrid' in trim else 0,
         "Transmission": transmission,
         "Displacement": "under3l",
-        "lead_ProviderService": adf_json['adf']['prospect'].get('provider', {}).get('service', 'autobytel  - trilogy smartleads'),
+        "lead_ProviderService": adf_json['adf']['prospect'].get('provider', {}).get('service',
+                                                                                    'autobytel  - trilogy smartleads'),
         'LeadConverted': 0,
         'Period': str(request_datetime.year) + '-' + str(request_datetime.month),
         "Model": adf_json['adf']['prospect']['vehicle']['model'],
