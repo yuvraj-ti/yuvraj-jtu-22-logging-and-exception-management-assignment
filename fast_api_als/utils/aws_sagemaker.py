@@ -7,7 +7,6 @@ from sagemaker.deserializers import JSONDeserializer
 
 endpoint_name = os.getenv('ENDPOINT_NAME')
 container_name = 'xgboost'
-endpoint_name = "LS-HYU-2017-als-1-087-a7f1301b-2022-02-21-06-07-55-150"
 
 
 def get_sagemaker_client():

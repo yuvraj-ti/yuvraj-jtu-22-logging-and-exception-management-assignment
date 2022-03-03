@@ -1,7 +1,7 @@
 import xmltodict, json
 from jsonschema import Draft7Validator, validate, draft7_format_checker
-from utils.adf_schema import schema
 import logging
+from .adf_schema import schema
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,0 +1,8 @@
+pandas
+sagemaker
+boto3
+fastapi==0.70.1
+uvicorn==0.15.0
+pgeocode
+xmltodict
+jsonschema
