@@ -17,6 +17,7 @@ from boto3 import Session
 
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.prep_data import conversion_to_ml_input
+from fast_api_als.utils.ml_init_data import dummy_data
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,75 +27,23 @@ logger = logging.getLogger(__name__)
 
 ALS_AWS_SECRET_KEY = os.getenv("ALS_AWS_SECRET_KEY")
 ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
+endpoint_name = os.getenv('ENDPOINT_NAME')
 
 app = FastAPI()
 
-dummy_data = [[5.33023135e+00, 1.00000000e+00, 0.00000000e+00, 3.00000000e+00,
-               0.00000000e+00, 3.60890000e+04, 4.61015488e+03, 0.00000000e+00,
-               1.00000000e+00, 1.00000000e+00, 2.08950000e+04, 0.00000000e+00,
-               4.60000000e+00, 4.90000000e+01, 9.70000000e+01, 5.34849063e+00,
-               8.91899306e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 1.00000000e+00, 1.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 1.00000000e+00, 0.00000000e+00,
-               1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 1.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00,
-               0.00000000e+00, 1.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 1.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 1.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
-               0.00000000e+00, 1.00000000e+00]]
-
-endpoint_name = os.getenv('ENDPOINT_NAME')
 container_name = 'xgboost'
 runtime = boto3.client(
     'runtime.sagemaker',
-    aws_access_key_id=os.getenv("ALS_AWS_ACCESS_KEY"),
-    aws_secret_access_key=os.getenv("ALS_AWS_SECRET_KEY"),
+    aws_access_key_id=ALS_AWS_ACCESS_KEY,
+    aws_secret_access_key=ALS_AWS_SECRET_KEY,
     region_name='us-east-1'
 )
 
 
 def get_sagemaker_client():
     session = Session(
-        aws_access_key_id=os.getenv("ALS_AWS_ACCESS_KEY"),
-        aws_secret_access_key=os.getenv("ALS_AWS_SECRET_KEY"),
+        aws_access_key_id=ALS_AWS_ACCESS_KEY,
+        aws_secret_access_key=ALS_AWS_SECRET_KEY,
         region_name='us-east-1'
     )
     return session
@@ -269,44 +218,6 @@ def get_ml_input_json(adf_json):
     }
 
 
-"""
-DistanctToVendor                      0.424685
-FirstLastPropCase                            0
-NameEmailCheck                               1
-SingleHour                                   3
-SingleWeekday                         saturday
-lead_TimeFrameCont                  Codenation
-EmailDomainCat                            high
-Vehicle_FinanceMethod                  unknown
-BroadColour                         Codenation
-ColoursNotChosen                             0
-Gender                                       m
-Income                                   83687
-ZipPopulationDensity                   4556.36
-ZipPopulationDensity_AverageUsed             0
-CountryOfOrigin                          asian
-AddressProvided                              1
-TelephonePreference                 Codenation
-AddressContainsNumericAndText                1
-Segment_Description                 midsizecar
-PriceStart                               20895
-Cylinders                              unknown
-Hybrid                                       0
-Transmission                           unknown
-Displacement                           under3l
-lead_ProviderService                Codenation
-LeadConverted                                0
-Period                                  201702
-Model                               Codenation
-Lead_Source                         Codenation
-Rating                                     4.6
-LifeTimeReviews                             79
-Recommended                                 93
-SCR                                    5.34849
-OCR                                    8.91899
-"""
-
-
 @app.get("/ping")
 def read_root():
     start = time.process_time()
@@ -388,7 +299,7 @@ async def predict(file: Request):
     return model_input
 
 
-@app.post("/predict1/")
+@app.post("/predict/")
 def predict1():
     csv_file = io.StringIO()
     # by default sagemaker expects comma separated
