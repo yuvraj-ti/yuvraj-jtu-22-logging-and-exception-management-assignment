@@ -41,6 +41,11 @@ def parse_xml(adf_xml):
 def validate_adf_values(input_json):
     input_json = input_json['adf']['prospect']
     zipcode = input_json['customer']['contact']['address']['postalcode']
+    email = input_json['customer']['contact'].get('email', None)
+    phone = input_json['customer']['contact'].get('phone', None)
+
+    if not email and not phone:
+        return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "either phone or email is required"}
 
     # zipcode validation
     pg = pgeocode.Nominatim('US')
@@ -53,9 +58,11 @@ def validate_adf_values(input_json):
     for id in input_json['id']:
         if id['@source'] == 'TCPA_Consent' and id['#text'].lower()=='yes':
             tcpa_consent = True
-    if not tcpa_consent:
+    if not email and not tcpa_consent:
         logger.info("TCPA Consent found as NO")
         return {"status": "REJECTED", "code": "7_NO_CONSENT", "message": "Contact Method missing TCPA consent"}
+
+    # request date in ISO8601 format
     if not validate_iso8601(input_json['requestdate']):
         logger.info("Datetime is not in ISO8601 format")
         return {"status": "REJECTED", "code": "3_INVALID_FIELD", "message": "Invalid DateTime"}

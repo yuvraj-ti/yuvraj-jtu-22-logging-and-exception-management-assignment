@@ -861,8 +861,6 @@ schema = {
                   ],
                   "required": [
                     "name",
-                    "email",
-                    "phone",
                     "address"
                   ],
                   "properties": {
