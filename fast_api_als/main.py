@@ -29,6 +29,8 @@ ALS_AWS_SECRET_KEY = os.getenv("ALS_AWS_SECRET_KEY")
 ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
 endpoint_name = os.getenv('ENDPOINT_NAME')
 
+dist = pgeocode.GeoDistance('US')
+
 app = FastAPI()
 
 container_name = 'xgboost'
@@ -149,7 +151,6 @@ def is_nan(x):
 
 def get_distance_to_vendor(dealer_code, customer_postal_code):
     dealer_postal_code = get_dealer_postal_code(dealer_code)
-    dist = pgeocode.GeoDistance('US')
     # distance in km
     val = dist.query_postal_code(dealer_postal_code, customer_postal_code)
     if is_nan(val):
@@ -240,14 +241,14 @@ async def submit(file: Request):
             "message": "Error occured while parsing XML"
         }
 
-    validation_check, validation_message = check_validation(obj)
+    validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
 
     if not validation_check:
         return {
             "status": "REJECTED",
-            "code": "6_MISSING_FIELD",
+            "code": validation_code,
             "message": validation_message
         }
 
