@@ -241,14 +241,14 @@ async def submit(file: Request):
             "message": "Error occured while parsing XML"
         }
 
-    validation_check, validation_message = check_validation(obj)
+    validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
 
     if not validation_check:
         return {
             "status": "REJECTED",
-            "code": "6_MISSING_FIELD",
+            "code": validation_code,
             "message": validation_message
         }
 
