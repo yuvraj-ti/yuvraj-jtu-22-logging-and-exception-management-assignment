@@ -10,6 +10,7 @@ import pgeocode
 from dateutil import parser
 import calendar
 import gender_guesser.detector as gender
+from uszipcode import SearchEngine
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
@@ -32,6 +33,7 @@ endpoint_name = os.getenv('ENDPOINT_NAME')
 
 dist = pgeocode.GeoDistance('US')
 g_guesser = gender.Detector(case_sensitive=False)
+zipcode_search = SearchEngine()
 
 app = FastAPI()
 
@@ -159,6 +161,12 @@ def get_distance_to_vendor(dealer_code, customer_postal_code):
         return 5000  # if nan then set to max default
     return val
 
+
+def find_demographic_data(zipcode):
+    z = zipcode_search.by_zipcode(zipcode).to_dict()
+    return z.get('median_household_income', 55319.39), z.get('population_density', 3585.81)
+
+
 def find_gender(names):
     first_name = ""
     for part_name in names:
@@ -176,6 +184,7 @@ def find_gender(names):
         return "?f"
     else:
         return "?"
+
 
 def get_ml_input_json(adf_json):
     distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect']['vendor'].get('id', {}).get('#text', None),
@@ -198,6 +207,8 @@ def get_ml_input_json(adf_json):
     cylinders = get_cylinder(trim)
     transmission = get_transmission(trim)
     price_start = get_price_start(adf_json['adf']['prospect']['vehicle'].get('price', []))
+    income, population_density = find_demographic_data(adf_json['adf']['prospect']['customer']['contact']['address'][
+                                                    'postalcode'])
     return {
         "DistanctToVendor": distance_to_vendor,
         "FirstLastPropCase": 0,
@@ -211,8 +222,8 @@ def get_ml_input_json(adf_json):
         "BroadColour": broad_color,
         "ColoursNotChosen": color_not_chosen,
         "Gender": gender_classification,
-        "Income": "55319.38839868469",
-        "ZipPopulationDensity": "3585.807443350386",
+        "Income": income,
+        "ZipPopulationDensity": population_density,
         "ZipPopulationDensity_AverageUsed": "0",
         "CountryOfOrigin": country_of_origin,
         "AddressProvided": 1 if street_address else 0,

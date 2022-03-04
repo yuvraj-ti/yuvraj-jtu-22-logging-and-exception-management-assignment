@@ -7,3 +7,4 @@ pgeocode
 xmltodict
 jsonschema
 gender-guesser==0.4.0
+uszipcode==1.0.1
