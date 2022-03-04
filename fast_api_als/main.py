@@ -9,6 +9,7 @@ import logging
 import pgeocode
 from dateutil import parser
 import calendar
+import gender_guesser.detector as gender
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
@@ -30,6 +31,7 @@ ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
 endpoint_name = os.getenv('ENDPOINT_NAME')
 
 dist = pgeocode.GeoDistance('US')
+g_guesser = gender.Detector(case_sensitive=False)
 
 app = FastAPI()
 
@@ -157,12 +159,29 @@ def get_distance_to_vendor(dealer_code, customer_postal_code):
         return 5000  # if nan then set to max default
     return val
 
+def find_gender(names):
+    first_name = ""
+    for part_name in names:
+        if part_name['@part'] == 'first':
+            first_name = part_name['#text']
+            break
+    gender = g_guesser.get_gender(first_name)
+    if gender == 'male':
+        return "m"
+    elif gender == 'female':
+        return "f"
+    elif gender == 'mostly_male':
+        return "?m"
+    elif gender == 'mostly_female':
+        return "?f"
+    else:
+        return "?"
 
 def get_ml_input_json(adf_json):
     distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect']['vendor'].get('id', {}).get('#text', None),
                                                 adf_json['adf']['prospect']['customer']['contact']['address'][
                                                     'postalcode'])
-
+    gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
     request_datetime = parser.parse(adf_json['adf']['prospect']['requestdate'])
     broad_color = get_broad_color(
         adf_json['adf']['prospect']['vehicle'].get('colorcombination', {}).get('exteriorcolor', None))
@@ -191,7 +210,7 @@ def get_ml_input_json(adf_json):
         "Vehicle_FinanceMethod": adf_json['adf']['prospect']['vehicle'].get("finance", {}).get("method", "unknown"),
         "BroadColour": broad_color,
         "ColoursNotChosen": color_not_chosen,
-        "Gender": "?",
+        "Gender": gender_classification,
         "Income": "55319.38839868469",
         "ZipPopulationDensity": "3585.807443350386",
         "ZipPopulationDensity_AverageUsed": "0",
