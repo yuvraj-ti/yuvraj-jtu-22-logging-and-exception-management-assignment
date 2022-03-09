@@ -9,6 +9,10 @@ import logging
 import pgeocode
 from dateutil import parser
 import calendar
+import uuid
+from datetime import datetime
+import copy
+import hashlib
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
@@ -18,6 +22,9 @@ from boto3 import Session
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.prep_data import conversion_to_ml_input
 from fast_api_als.utils.ml_init_data import dummy_data
+from fast_api_als.utils.utils import get_boto3_session
+
+from utils.db_helper import DBHelper
 
 logging.basicConfig(
     level=logging.INFO,
@@ -218,6 +225,30 @@ def get_ml_input_json(adf_json):
     }
 
 
+def calculate_lead_hash(obj):
+    logger.info(f"calculating hash...")
+    """MD5 hash of a dictionary."""
+    adf = copy.deepcopy(obj)
+    adf['adf']['prospect'].pop('provider')
+    adf['adf']['prospect'].pop('requestdate')
+    dhash = hashlib.md5()
+    encoded = json.dumps(adf, sort_keys=True).encode()
+    dhash.update(encoded)
+    logger.info("hash calculated without provider data")
+    return dhash.hexdigest()
+
+
+def get_contact_details(obj):
+    email = obj['adf']['prospect']['customer']['contact'].get('email', '')
+    phone = obj['adf']['prospect']['customer']['contact'].get('phone', {}).get('#text', '')
+    last_name = ''
+    for part_name in obj['adf']['prospect']['customer']['contact']['name']:
+        if part_name['@part'] == 'last':
+            last_name = part_name['#text']
+            break
+    return email, phone, last_name
+
+
 @app.get("/ping")
 def read_root():
     start = time.process_time()
@@ -265,6 +296,34 @@ async def submit(file: Request):
         response_body["status"] = "REJECTED"
         response_body["code"] = "16_LOW_SCORE"
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
+
+    session = get_boto3_session()
+    db_helper = DBHelper(session)
+
+    lead_hash = calculate_lead_hash(obj)
+    duplicate_call, response = db_helper.check_duplicate_api_call(lead_hash, obj['adf']['prospect']['provider']['service'])
+    if duplicate_call:
+        return {
+            "status": f"Already {response}",
+            "message": "Duplicate Api Call"
+        }
+    email, phone, last_name = get_contact_details(obj)
+    db_helper.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
+
+    if response_body['status'] == 'ACCEPTED':
+        lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email+phone+last_name)
+        logger.info(lead_uuid)
+        db_helper.insert_oem_lead(uuid=lead_uuid,
+                                  make=obj['adf']['prospect']['vehicle']['make'],
+                                  model=obj['adf']['prospect']['vehicle']['model'],
+                                  date=datetime.today().strftime('%Y-%m-%d'),
+                                  email=email,
+                                  phone=phone,
+                                  last_name=last_name,
+                                  timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
+                                  make_model_filter_status=db_helper.get_make_model_filter_status(
+                                      obj['adf']['prospect']['vehicle']['make'])
+                                  )
     return response_body
 
 
