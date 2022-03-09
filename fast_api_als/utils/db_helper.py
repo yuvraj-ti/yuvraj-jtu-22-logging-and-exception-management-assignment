@@ -29,13 +29,13 @@ class DBHelper:
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
 
-    def insert_oem_lead(self, uuid: str, oem: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
+    def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
                         timestamp: str, make_model_filter_status: str):
 
         item = {
-            'pk': f"{oem}#{uuid}",
+            'pk': f"{make}#{uuid}",
             'sk': f"{make}#{model}" if make_model_filter_status else "",
-            'gsipk': f"{oem}#{date}",
+            'gsipk': f"{make}#{date}",
             'gsisk': "0#0",
             'make': make,
             'model': model,
@@ -48,20 +48,20 @@ class DBHelper:
         }
 
         response = self.table.put_item(Item=item)
-        verify_add_entry_response(response, f"{oem}#{email}#{phone}#{last_name}")
+        verify_add_entry_response(response, f"{make}#{email}#{phone}#{last_name}")
 
     def check_duplicate_api_call(self, lead_hash: str, lead_provider: str):
         res = self.table.get_item(
-            Key = {
-                'pk': lead_hash,
+            Key={
+                'pk': f"LEAD#{lead_hash}",
                 'sk': lead_provider
             }
         )
         item = res.get('Item')
         if not item:
-            return False
+            return False, ""
         else:
-            return True
+            return True, item['response']
 
     def accepted_lead_not_sent_for_oem(self, oem: str, date: str):
         res = self.table.query(
@@ -100,6 +100,18 @@ class DBHelper:
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{uuid}#{oem}#{make}#{model}")
         return True
+
+    def get_make_model_filter_status(self, oem: str):
+        res = self.table.get_item(
+            Key={
+                'pk': f"OEM#{oem}",
+                'sk': 'METADATA'
+            }
+        )
+        verify_add_entry_response(res, oem)
+        if res['Item'].get('settings', {}).get('make_model', "False") == 'True':
+            return True
+        return False
 
 
 def verify_add_entry_response(response, data):
