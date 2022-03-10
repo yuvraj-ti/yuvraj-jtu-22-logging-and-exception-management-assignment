@@ -6,5 +6,7 @@ uvicorn==0.15.0
 pgeocode
 xmltodict
 jsonschema
+gender-guesser==0.4.0
+uszipcode==1.0.1
 boto3==1.20.26
 botocore==1.23.26

@@ -9,6 +9,8 @@ import logging
 import pgeocode
 from dateutil import parser
 import calendar
+import gender_guesser.detector as gender
+from uszipcode import SearchEngine
 import uuid
 from datetime import datetime
 import copy
@@ -43,6 +45,8 @@ API_KEY_NAME = "x-api-key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME)
 
 dist = pgeocode.GeoDistance('US')
+g_guesser = gender.Detector(case_sensitive=False)
+zipcode_search = SearchEngine()
 
 app = FastAPI()
 
@@ -174,11 +178,35 @@ def get_distance_to_vendor(dealer_code, customer_postal_code):
     return val
 
 
+def find_demographic_data(zipcode):
+    z = zipcode_search.by_zipcode(zipcode).to_dict()
+    return z.get('median_household_income', 55319.39), z.get('population_density', 3585.81)
+
+
+def find_gender(names):
+    first_name = ""
+    for part_name in names:
+        if part_name['@part'] == 'first':
+            first_name = part_name['#text']
+            break
+    gender = g_guesser.get_gender(first_name)
+    if gender == 'male':
+        return "m"
+    elif gender == 'female':
+        return "f"
+    elif gender == 'mostly_male':
+        return "?m"
+    elif gender == 'mostly_female':
+        return "?f"
+    else:
+        return "?"
+
+
 def get_ml_input_json(adf_json):
     distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect']['vendor'].get('id', {}).get('#text', None),
                                                 adf_json['adf']['prospect']['customer']['contact']['address'][
                                                     'postalcode'])
-
+    gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
     request_datetime = parser.parse(adf_json['adf']['prospect']['requestdate'])
     broad_color = get_broad_color(
         adf_json['adf']['prospect']['vehicle'].get('colorcombination', {}).get('exteriorcolor', None))
@@ -195,6 +223,8 @@ def get_ml_input_json(adf_json):
     cylinders = get_cylinder(trim)
     transmission = get_transmission(trim)
     price_start = get_price_start(adf_json['adf']['prospect']['vehicle'].get('price', []))
+    income, population_density = find_demographic_data(adf_json['adf']['prospect']['customer']['contact']['address'][
+                                                    'postalcode'])
     return {
         "DistanctToVendor": distance_to_vendor,
         "FirstLastPropCase": 0,
@@ -207,9 +237,9 @@ def get_ml_input_json(adf_json):
         "Vehicle_FinanceMethod": adf_json['adf']['prospect']['vehicle'].get("finance", {}).get("method", "unknown"),
         "BroadColour": broad_color,
         "ColoursNotChosen": color_not_chosen,
-        "Gender": "?",
-        "Income": "55319.38839868469",
-        "ZipPopulationDensity": "3585.807443350386",
+        "Gender": gender_classification,
+        "Income": income,
+        "ZipPopulationDensity": population_density,
         "ZipPopulationDensity_AverageUsed": "0",
         "CountryOfOrigin": country_of_origin,
         "AddressProvided": 1 if street_address else 0,

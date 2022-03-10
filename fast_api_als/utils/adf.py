@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 # ISO8601 datetime regex
 regex = r'^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$'
 match_iso8601 = re.compile(regex).match
+pg = pgeocode.Nominatim('US')
 
 
 def validate_iso8601(requestdate):
@@ -26,7 +27,7 @@ def validate_iso8601(requestdate):
 
 
 def is_nan(x):
-    return x!=x
+    return x != x
 
 
 def parse_xml(adf_xml):
@@ -43,12 +44,23 @@ def validate_adf_values(input_json):
     zipcode = input_json['customer']['contact']['address']['postalcode']
     email = input_json['customer']['contact'].get('email', None)
     phone = input_json['customer']['contact'].get('phone', None)
+    names = input_json['customer']['contact']['name']
+
+    first_name, last_name = False, False
+    for name_part in names:
+        if name_part.get('@part', '') == 'first' and name_part.get('#text', '') != '':
+            first_name = True
+        if name_part.get('@part', '') == 'last' and name_part.get('#text', '') != '':
+            last_name = True
+
+    if not first_name or not last_name:
+        logger.info(f"name is incomplete")
+        return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "name is incomplete"}
 
     if not email and not phone:
         return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "either phone or email is required"}
 
     # zipcode validation
-    pg = pgeocode.Nominatim('US')
     res = pg.query_postal_code(zipcode)
     if is_nan(res['country_code']):
         return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
@@ -56,7 +68,7 @@ def validate_adf_values(input_json):
     # check for TCPA Consent
     tcpa_consent = False
     for id in input_json['id']:
-        if id['@source'] == 'TCPA_Consent' and id['#text'].lower()=='yes':
+        if id['@source'] == 'TCPA_Consent' and id['#text'].lower() == 'yes':
             tcpa_consent = True
     if not email and not tcpa_consent:
         logger.info("TCPA Consent found as NO")
