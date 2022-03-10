@@ -22,7 +22,7 @@ from fastapi import FastAPI, Request, Security, HTTPException, Depends
 from boto3 import Session
 
 from fast_api_als.utils.adf import parse_xml, check_validation
-from fast_api_als.utils.prep_data import conversion_to_ml_input
+from fast_api_als.utils.prep_data import conversion_to_ml_input, conversion_to_ml_input_no_dealer
 from fast_api_als.utils.ml_init_data import dummy_data
 from fast_api_als.utils.utils import get_boto3_session
 
@@ -39,7 +39,9 @@ logger = logging.getLogger(__name__)
 
 ALS_AWS_SECRET_KEY = os.getenv("ALS_AWS_SECRET_KEY")
 ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
-endpoint_name = os.getenv('ENDPOINT_NAME')
+
+hyu_dealer_endpoint_name = os.getenv('HYU_DEALER_ENDPOINT_NAME')
+hyu_no_dealer_endpoint_name = os.getenv('HYU_NO_DEALER_ENDPOINT_NAME')
 
 API_KEY_NAME = "x-api-key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME)
@@ -49,7 +51,7 @@ g_guesser = gender.Detector(case_sensitive=False)
 zipcode_search = SearchEngine()
 
 app = FastAPI()
-
+csv_file = io.StringIO()
 session = get_boto3_session()
 db_helper = DBHelper(session)
 
@@ -71,7 +73,7 @@ def get_sagemaker_client():
     return session
 
 
-def get_predictor(sagemaker_client):
+def get_predictor(sagemaker_client, endpoint_name):
     predictor = sagemaker.predictor.Predictor(
         endpoint_name,
         sagemaker_session=sagemaker.session.Session(sagemaker_client)
@@ -82,11 +84,26 @@ def get_predictor(sagemaker_client):
 
 
 sagemaker_client = get_sagemaker_client()
-predictor = get_predictor(sagemaker_client)
+hyu_dealer_predictor = get_predictor(sagemaker_client, hyu_dealer_endpoint_name)
+hyu_no_dealer_predictor = get_predictor(sagemaker_client, hyu_no_dealer_endpoint_name)
 
 
-def get_prediction(ml_input):
+def get_prediction(ml_input, predictor):
     result = predictor.predict(ml_input, initial_args={'ContentType': 'text/csv'})
+    return result
+
+
+def ml_predict_score(ml_input, endpoint_name):
+    # by default sagemaker expects comma separated
+    ml_input = [ml_input]
+    df = pd.DataFrame(ml_input)
+    df.to_csv(csv_file, sep=",", header=False, index=False)
+    my_payload_as_csv = csv_file.getvalue()
+    # print(my_payload_as_csv)
+    response = runtime.invoke_endpoint(EndpointName=endpoint_name,
+                                       ContentType='text/csv',
+                                       Body=my_payload_as_csv)
+    result = json.loads(response['Body'].read().decode())
     return result
 
 
@@ -224,7 +241,7 @@ def get_ml_input_json(adf_json):
     transmission = get_transmission(trim)
     price_start = get_price_start(adf_json['adf']['prospect']['vehicle'].get('price', []))
     income, population_density = find_demographic_data(adf_json['adf']['prospect']['customer']['contact']['address'][
-                                                    'postalcode'])
+                                                           'postalcode'])
     return {
         "DistanctToVendor": distance_to_vendor,
         "FirstLastPropCase": 0,
@@ -289,8 +306,7 @@ def get_contact_details(obj):
     return email, phone, last_name
 
 
-async def get_api_key( api_key_header: str = Security(api_key_header)):
-
+async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header:
         return api_key_header
     else:
@@ -358,11 +374,21 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     model_input = get_ml_input_json(obj)
     logger.info(model_input)
-    ml_input = conversion_to_ml_input(model_input)
-    logger.info(ml_input)
-    result = get_prediction(ml_input)
-    time_taken = (time.process_time() - start) * 1000
+    # check if vendor is available here
+    vendor_available = True
     response_body = {}
+    if vendor_available:
+        ml_input = conversion_to_ml_input(model_input)
+        logger.info(ml_input)
+        # result = ml_predict_score(ml_input)
+        result = get_prediction(ml_input, hyu_dealer_predictor)
+    else:
+        ml_input = conversion_to_ml_input_no_dealer(model_input)
+        logger.info(ml_input)
+        # result = ml_predict_score(ml_input)
+        result = get_prediction(ml_input, hyu_no_dealer_predictor)
+    time_taken = (time.process_time() - start) * 1000
+
     if result > 0.083:
         response_body["status"] = "ACCEPTED"
         response_body["code"] = "0_ACCEPTED"
@@ -372,7 +398,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
 
     lead_hash = calculate_lead_hash(obj)
-    duplicate_call, response = db_helper.check_duplicate_api_call(lead_hash, obj['adf']['prospect']['provider']['service'])
+    duplicate_call, response = db_helper.check_duplicate_api_call(lead_hash,
+                                                                  obj['adf']['prospect']['provider']['service'])
     if duplicate_call:
         return {
             "status": f"Already {response}",
@@ -382,7 +409,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     db_helper.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
     if response_body['status'] == 'ACCEPTED':
-        lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email+phone+last_name)
+        lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name)
         db_helper.insert_oem_lead(uuid=lead_uuid,
                                   make=obj['adf']['prospect']['vehicle']['make'],
                                   model=obj['adf']['prospect']['vehicle']['model'],
@@ -430,17 +457,9 @@ async def predict(file: Request):
 
 
 @app.post("/predict/")
-def predict1():
-    csv_file = io.StringIO()
-    # by default sagemaker expects comma separated
-    df = pd.DataFrame(dummy_data)
-    df.to_csv(csv_file, sep=",", header=False, index=False)
-    my_payload_as_csv = csv_file.getvalue()
+def predict():
     start = time.process_time()
-    response = runtime.invoke_endpoint(EndpointName=endpoint_name,
-                                       ContentType='text/csv',
-                                       Body=my_payload_as_csv)
-    result = json.loads(response['Body'].read().decode())
+    result = ml_predict_score(dummy_data, hyu_dealer_endpoint_name)
     time_taken = (time.process_time() - start) * 1000
     response_body = {}
     if result > 0.033:
