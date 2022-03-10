@@ -30,7 +30,7 @@ class DBHelper:
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
-                        timestamp: str, make_model_filter_status: str):
+                        timestamp: str, make_model_filter_status: str, lead_hash: str):
 
         item = {
             'pk': f"{make}#{uuid}",
@@ -44,7 +44,8 @@ class DBHelper:
             'last_name': last_name,
             'timestamp': timestamp,
             'conversion_status': "0",
-            "make_model_filter_status": make_model_filter_status
+            "make_model_filter_status": make_model_filter_status,
+            "lead_hash": lead_hash
         }
 
         response = self.table.put_item(Item=item)

@@ -361,7 +361,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                   last_name=last_name,
                                   timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
                                   make_model_filter_status=db_helper.get_make_model_filter_status(
-                                      obj['adf']['prospect']['vehicle']['make'])
+                                      obj['adf']['prospect']['vehicle']['make']),
+                                  lead_hash=lead_hash
                                   )
     return response_body
 
