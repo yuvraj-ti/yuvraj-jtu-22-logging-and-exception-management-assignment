@@ -42,6 +42,8 @@ endpoint_name = os.getenv('ENDPOINT_NAME')
 API_KEY_NAME = "x-api-key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME)
 
+dist = pgeocode.GeoDistance('US')
+
 app = FastAPI()
 
 session = get_boto3_session()
@@ -165,7 +167,6 @@ def is_nan(x):
 
 def get_distance_to_vendor(dealer_code, customer_postal_code):
     dealer_postal_code = get_dealer_postal_code(dealer_code)
-    dist = pgeocode.GeoDistance('US')
     # distance in km
     val = dist.query_postal_code(dealer_postal_code, customer_postal_code)
     if is_nan(val):
@@ -314,14 +315,14 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "message": "Error occured while parsing XML"
         }
 
-    validation_check, validation_message = check_validation(obj)
+    validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
 
     if not validation_check:
         return {
             "status": "REJECTED",
-            "code": "6_MISSING_FIELD",
+            "code": validation_code,
             "message": validation_message
         }
 
