@@ -11,15 +11,25 @@ from dateutil import parser
 import calendar
 import gender_guesser.detector as gender
 from uszipcode import SearchEngine
+import uuid
+from datetime import datetime
+import copy
+import hashlib
 
 from sagemaker.serializers import CSVSerializer
 from sagemaker.deserializers import JSONDeserializer
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Security, HTTPException, Depends
 from boto3 import Session
 
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.prep_data import conversion_to_ml_input
 from fast_api_als.utils.ml_init_data import dummy_data
+from fast_api_als.utils.utils import get_boto3_session
+
+from utils.db_helper import DBHelper
+
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN, HTTP_201_CREATED
+from fastapi.security.api_key import APIKeyHeader, APIKey
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,11 +41,17 @@ ALS_AWS_SECRET_KEY = os.getenv("ALS_AWS_SECRET_KEY")
 ALS_AWS_ACCESS_KEY = os.getenv("ALS_AWS_ACCESS_KEY")
 endpoint_name = os.getenv('ENDPOINT_NAME')
 
+API_KEY_NAME = "x-api-key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME)
+
 dist = pgeocode.GeoDistance('US')
 g_guesser = gender.Detector(case_sensitive=False)
 zipcode_search = SearchEngine()
 
 app = FastAPI()
+
+session = get_boto3_session()
+db_helper = DBHelper(session)
 
 container_name = 'xgboost'
 runtime = boto3.client(
@@ -249,6 +265,40 @@ def get_ml_input_json(adf_json):
     }
 
 
+def calculate_lead_hash(obj):
+    logger.info(f"calculating hash...")
+    """MD5 hash of a dictionary."""
+    adf = copy.deepcopy(obj)
+    adf['adf']['prospect'].pop('provider')
+    adf['adf']['prospect'].pop('requestdate')
+    dhash = hashlib.md5()
+    encoded = json.dumps(adf, sort_keys=True).encode()
+    dhash.update(encoded)
+    logger.info("hash calculated without provider data")
+    return dhash.hexdigest()
+
+
+def get_contact_details(obj):
+    email = obj['adf']['prospect']['customer']['contact'].get('email', '')
+    phone = obj['adf']['prospect']['customer']['contact'].get('phone', {}).get('#text', '')
+    last_name = ''
+    for part_name in obj['adf']['prospect']['customer']['contact']['name']:
+        if part_name['@part'] == 'last':
+            last_name = part_name['#text']
+            break
+    return email, phone, last_name
+
+
+async def get_api_key( api_key_header: str = Security(api_key_header)):
+
+    if api_key_header:
+        return api_key_header
+    else:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN, detail="Could not validate credentials"
+        )
+
+
 @app.get("/ping")
 def read_root():
     start = time.process_time()
@@ -256,9 +306,33 @@ def read_root():
     return {f"Pong with response time {time_taken} ms"}
 
 
+@app.post("/register3PL")
+async def register3pl(cred: Request):
+    body = await cred.body()
+    body = json.loads(body)
+    username, password = body['username'], body['password']
+    apikey = db_helper.register_3PL(username)
+
+    # check if 3PL is already registered
+    if not apikey:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Already registered"
+        }
+    return {
+        "status": HTTP_201_CREATED,
+        "x-api-key": apikey,
+        "message": "Include x-api-key in header"
+    }
+
+
 @app.post("/submit/")
-async def submit(file: Request):
+async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     start = time.process_time()
+    if not db_helper.verify_api_key(apikey):
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN, detail="Wrong API Key"
+        )
     body = await file.body()
     body = str(body, 'utf-8')
 
@@ -296,6 +370,31 @@ async def submit(file: Request):
         response_body["status"] = "REJECTED"
         response_body["code"] = "16_LOW_SCORE"
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
+
+    lead_hash = calculate_lead_hash(obj)
+    duplicate_call, response = db_helper.check_duplicate_api_call(lead_hash, obj['adf']['prospect']['provider']['service'])
+    if duplicate_call:
+        return {
+            "status": f"Already {response}",
+            "message": "Duplicate Api Call"
+        }
+    email, phone, last_name = get_contact_details(obj)
+    db_helper.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
+
+    if response_body['status'] == 'ACCEPTED':
+        lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email+phone+last_name)
+        db_helper.insert_oem_lead(uuid=lead_uuid,
+                                  make=obj['adf']['prospect']['vehicle']['make'],
+                                  model=obj['adf']['prospect']['vehicle']['model'],
+                                  date=datetime.today().strftime('%Y-%m-%d'),
+                                  email=email,
+                                  phone=phone,
+                                  last_name=last_name,
+                                  timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
+                                  make_model_filter_status=db_helper.get_make_model_filter_status(
+                                      obj['adf']['prospect']['vehicle']['make']),
+                                  lead_hash=lead_hash
+                                  )
     return response_body
 
 
