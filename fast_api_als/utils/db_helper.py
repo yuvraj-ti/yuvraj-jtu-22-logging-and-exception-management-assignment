@@ -1,4 +1,4 @@
-import json
+import uuid
 import logging
 
 import boto3
@@ -112,6 +112,34 @@ class DBHelper:
         if res['Item'].get('settings', {}).get('make_model', "False") == 'True':
             return True
         return False
+
+    def verify_api_key(self, apikey: str):
+        res = self.table.query(
+            IndexName='gsi-index',
+            KeyConditionExpression=Key('gsipk').eq(apikey)
+        )
+        item = res.get('Items', [])
+        if len(item) == 0:
+            return False
+        return True
+
+    def register_3PL(self, username: str):
+        res = self.table.query(
+            KeyConditionExpression=Key('pk').eq(username)
+        )
+        item = res.get('Items', [])
+        if len(item):
+            return None
+        apikey = uuid.uuid4().hex
+        res = self.table.put_item(
+            Item={
+                'pk': username,
+                'sk': apikey,
+                'gsipk': apikey,
+                'gsisk': username
+            }
+        )
+        return apikey
 
 
 def verify_add_entry_response(response, data):
