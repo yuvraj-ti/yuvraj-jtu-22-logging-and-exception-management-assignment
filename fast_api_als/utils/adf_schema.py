@@ -323,7 +323,6 @@ schema = {
             "requestdate",
             "vehicle",
             "customer",
-            "vendor",
             "provider"
           ],
           "properties": {
@@ -1153,7 +1152,6 @@ schema = {
                 }
               ],
               "required": [
-                "id"
               ],
               "properties": {
                 "id": {

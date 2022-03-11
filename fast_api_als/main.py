@@ -221,7 +221,7 @@ def find_gender(names):
 
 
 def get_ml_input_json(adf_json):
-    distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect']['vendor'].get('id', {}).get('#text', None),
+    distance_to_vendor = get_distance_to_vendor(adf_json['adf']['prospect'].get('vendor', {}).get('id', {}).get('#text', None),
                                                 adf_json['adf']['prospect']['customer']['contact']['address'][
                                                     'postalcode'])
     gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
@@ -385,7 +385,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     model_input = get_ml_input_json(obj)
     logger.info(model_input)
     # check if vendor is available here
-    vendor_available = True
+    vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
     response_body = {}
     if vendor_available:
         ml_input = conversion_to_ml_input_hyu_dealer(model_input)
