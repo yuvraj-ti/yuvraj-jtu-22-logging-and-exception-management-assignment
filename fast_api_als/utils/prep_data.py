@@ -1,12 +1,12 @@
-from .ml_init_data import initial_ml_input, columns_list
-from .ml_init_data import initial_ml_input_no_dealer, columns_list_no_dealer
+from .ml_init_data import columns_list_hyu_dealer, columns_list_hyu_no_dealer,\
+    initial_ml_input_hyu_no_dealer, initial_ml_input_hyu_dealer
 
 
-def conversion_to_ml_input(data):
+def conversion_to_ml_input_hyu_dealer(data):
     ml_input = []
-    ml_data_json = initial_ml_input
+    ml_data_json = initial_ml_input_hyu_dealer
     for key in data:
-        if key in columns_list:
+        if key in columns_list_hyu_dealer:
             ml_data_json[key] = float(data[key])
         else:
             new_key = f"{key}_{data[key]}"
@@ -18,11 +18,11 @@ def conversion_to_ml_input(data):
     return ml_input
 
 
-def conversion_to_ml_input_no_dealer(data):
+def conversion_to_ml_input_hyu_no_dealer(data):
     ml_input = []
-    ml_data_json = initial_ml_input_no_dealer
+    ml_data_json = initial_ml_input_hyu_no_dealer
     for key in data:
-        if key in columns_list_no_dealer:
+        if key in columns_list_hyu_no_dealer:
             ml_data_json[key] = float(data[key])
         else:
             new_key = f"{key}_{data[key]}"

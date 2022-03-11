@@ -1,4 +1,4 @@
-columns_list = [
+columns_list_hyu_dealer = [
     'DistanctToVendor',
     'FirstLastPropCase',
     'NameEmailCheck',
@@ -18,7 +18,7 @@ columns_list = [
     'OCR'
 ]
 
-columns_list_no_dealer = [
+columns_list_hyu_no_dealer = [
     'FirstLastPropCase',
     'NameEmailCheck',
     'SingleHour',
@@ -32,7 +32,7 @@ columns_list_no_dealer = [
     'Hybrid'
 ]
 
-initial_ml_input = {
+initial_ml_input_hyu_dealer = {
     "DistanctToVendor": 0,
     "FirstLastPropCase": 0,
     "NameEmailCheck": 0,
@@ -237,7 +237,7 @@ initial_ml_input = {
     "Lead_Source_trilogy smartleads": 0
 }
 
-initial_ml_input_no_dealer = {
+initial_ml_input_hyu_no_dealer = {
     "FirstLastPropCase": 0,
     "NameEmailCheck": 0,
     "SingleHour": 0,

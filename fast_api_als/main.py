@@ -22,7 +22,7 @@ from fastapi import FastAPI, Request, Security, HTTPException, Depends
 from boto3 import Session
 
 from fast_api_als.utils.adf import parse_xml, check_validation
-from fast_api_als.utils.prep_data import conversion_to_ml_input, conversion_to_ml_input_no_dealer
+from fast_api_als.utils.prep_data import conversion_to_ml_input_hyu_dealer, conversion_to_ml_input_hyu_no_dealer
 from fast_api_als.utils.ml_init_data import dummy_data
 from fast_api_als.utils.utils import get_boto3_session
 
@@ -103,8 +103,9 @@ def ml_predict_score(ml_input, endpoint_name):
     response = runtime.invoke_endpoint(EndpointName=endpoint_name,
                                        ContentType='text/csv',
                                        Body=my_payload_as_csv)
-    result = json.loads(response['Body'].read().decode())
-    return result
+    return float(response['Body'].read().decode().split(',')[0])
+    # result = json.loads(response['Body'].read().decode())
+    # return result
 
 
 def get_dealer_postal_code(dealer_code):
@@ -361,6 +362,15 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "message": "Error occured while parsing XML"
         }
 
+    lead_hash = calculate_lead_hash(obj)
+    duplicate_call, response = db_helper.check_duplicate_api_call(lead_hash,
+                                                                  obj['adf']['prospect']['provider']['service'])
+    if duplicate_call:
+        return {
+            "status": f"Already {response}",
+            "message": "Duplicate Api Call"
+        }
+
     validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
@@ -378,15 +388,15 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     vendor_available = True
     response_body = {}
     if vendor_available:
-        ml_input = conversion_to_ml_input(model_input)
+        ml_input = conversion_to_ml_input_hyu_dealer(model_input)
         logger.info(ml_input)
-        # result = ml_predict_score(ml_input)
-        result = get_prediction(ml_input, hyu_dealer_predictor)
+        result = ml_predict_score(ml_input, hyu_dealer_endpoint_name)
+        # result = get_prediction(ml_input, hyu_dealer_predictor)
     else:
-        ml_input = conversion_to_ml_input_no_dealer(model_input)
+        ml_input = conversion_to_ml_input_hyu_no_dealer(model_input)
         logger.info(ml_input)
-        # result = ml_predict_score(ml_input)
-        result = get_prediction(ml_input, hyu_no_dealer_predictor)
+        result = ml_predict_score(ml_input, hyu_no_dealer_endpoint_name)
+        # result = get_prediction(ml_input, hyu_no_dealer_predictor)
     time_taken = (time.process_time() - start) * 1000
 
     if result > 0.083:
@@ -397,14 +407,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["code"] = "16_LOW_SCORE"
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
 
-    lead_hash = calculate_lead_hash(obj)
-    duplicate_call, response = db_helper.check_duplicate_api_call(lead_hash,
-                                                                  obj['adf']['prospect']['provider']['service'])
-    if duplicate_call:
-        return {
-            "status": f"Already {response}",
-            "message": "Duplicate Api Call"
-        }
     email, phone, last_name = get_contact_details(obj)
     db_helper.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
