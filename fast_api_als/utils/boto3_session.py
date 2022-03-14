@@ -1,13 +1,13 @@
 import logging
-import os
 import boto3
+from fast_api_als.constants import ALS_AWS_REGION, ALS_AWS_ACCESS_KEY, ALS_AWS_SECRET_KEY
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)0.8s] %(message)s",
 )
 logger = logging.getLogger(__name__)
-from fast_api_als.constants import ALS_AWS_REGION, ALS_AWS_ACCESS_KEY, ALS_AWS_SECRET_KEY
+
 
 def get_boto3_session():
     """

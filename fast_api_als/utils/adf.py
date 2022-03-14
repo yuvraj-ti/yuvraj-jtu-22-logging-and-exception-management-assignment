@@ -1,5 +1,5 @@
-import xmltodict, json
-from jsonschema import Draft7Validator, validate, draft7_format_checker
+import xmltodict
+from jsonschema import validate, draft7_format_checker
 import logging
 from .adf_schema import schema
 import pgeocode
@@ -12,7 +12,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ISO8601 datetime regex
-regex = r'^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$'
+regex = r'^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([' \
+        r'0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$ '
 match_iso8601 = re.compile(regex).match
 pg = pgeocode.Nominatim('US')
 
