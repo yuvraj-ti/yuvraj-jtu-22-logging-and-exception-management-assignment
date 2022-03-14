@@ -131,10 +131,12 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["code"] = "16_LOW_SCORE"
     email, phone, last_name = get_contact_details(obj)
 
-    contact_verified = await verify_phone_and_email(email, phone)
-    if not contact_verified:
-        response_body['status'] = 'REJECTED'
-        response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
+    if response_body['status'] == 'ACCEPTED':
+        contact_verified = await verify_phone_and_email(email, phone)
+        if not contact_verified:
+            response_body['status'] = 'REJECTED'
+            response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
+
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
     return response_body
