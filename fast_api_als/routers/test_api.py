@@ -10,7 +10,8 @@ from fast_api_als.constants import (
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
-from fast_api_als.services.predict_score import ml_predict_score
+from fast_api_als.services.hyu_predictor import hyu_dealer_predictor, hyu_no_dealer_predictor
+from fast_api_als.services.predict_score import ml_predict_score, get_prediction
 from fast_api_als.services.prep_data import conversion_to_ml_input_hyu_dealer, conversion_to_ml_input_hyu_no_dealer
 from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
@@ -115,13 +116,16 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     if vendor_available:
         ml_input = conversion_to_ml_input_hyu_dealer(model_input)
         logger.info(ml_input)
+
         result = ml_predict_score(ml_input, HYU_DEALER_ENDPOINT_NAME)
-        # result = get_prediction(ml_input, hyu_dealer_predictor)
+        logger.info(f"Result: {result}")
+        result = get_prediction(ml_input, hyu_dealer_predictor)
+        logger.info(f"Result: {result}")
     else:
         ml_input = conversion_to_ml_input_hyu_no_dealer(model_input)
         logger.info(ml_input)
-        result = ml_predict_score(ml_input, HYU_NO_DEALER_ENDPOINT_NAME)
-        # result = get_prediction(ml_input, hyu_no_dealer_predictor)
+        # result = ml_predict_score(ml_input, HYU_NO_DEALER_ENDPOINT_NAME)
+        result = get_prediction(ml_input, hyu_no_dealer_predictor)
 
     if result > 0.083:
         response_body["status"] = "ACCEPTED"
