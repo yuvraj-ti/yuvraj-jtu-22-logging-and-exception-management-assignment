@@ -74,6 +74,14 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "message": validation_message
         }
 
+    email, phone, last_name = get_contact_details(obj)
+    if db_helper_session.check_duplicate_lead(email, phone, last_name):
+        return {
+            "status": "REJECTED",
+            "code": "12_DUPLICATE",
+            "message": "This is a duplicate lead"
+        }
+
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
     # check if vendor is available here
@@ -98,7 +106,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["status"] = "REJECTED"
         response_body["code"] = "16_LOW_SCORE"
 
-    email, phone, last_name = get_contact_details(obj)
     db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
     if response_body['status'] == 'ACCEPTED':
@@ -125,7 +132,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                                email=email,
                                                phone=phone,
                                                last_name=last_name,
-                                               oem=obj['adf']['prospect']['vehicle']['make'])
+                                               oem=obj['adf']['prospect']['vehicle']['make'],
+                                               model=obj['adf']['prospect']['vehicle']['model'])
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
     logger.info(f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
