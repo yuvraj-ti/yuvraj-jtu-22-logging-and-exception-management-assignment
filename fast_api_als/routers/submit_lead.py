@@ -14,7 +14,7 @@ from fast_api_als.constants import (
     HYU_DEALER_ENDPOINT_NAME,
     HYU_NO_DEALER_ENDPOINT_NAME
 )
-from fast_api_als.database import db_helper
+
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
@@ -50,7 +50,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     if not obj:
         logger.info(f"Error occured while parsing XML")
-        provider = db_helper.get_api_key_author(apikey)
+        provider = db_helper_session.get_api_key_author(apikey)
         obj = {
             'provider': {
                 'service': provider
