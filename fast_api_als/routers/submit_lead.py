@@ -112,6 +112,10 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["status"] = "REJECTED"
         response_body["code"] = "16_LOW_SCORE"
 
+    item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
+                                        response_body['code'])
+    s3_helper.put_file(item=item, path=path)
+
     email, phone, last_name = get_contact_details(obj)
     db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
