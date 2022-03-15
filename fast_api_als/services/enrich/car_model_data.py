@@ -17,7 +17,9 @@ def get_cylinder(trim):
 
 
 def get_transmission(trim):
-    if 'Manual' in trim or 'man' in trim:
+    if not trim:
+        return 'unknown'
+    elif 'Manual' in trim or 'man' in trim:
         return 'manual'
     elif 'Automatic' in trim or 'auto' in trim:
         return 'automatic'
@@ -25,6 +27,8 @@ def get_transmission(trim):
 
 
 def get_price_start(price_list):
+    if not price_list:
+        return '0'
     price = '0'
     for prices in price_list:
         price = max(price, prices['#text'])
@@ -32,7 +36,9 @@ def get_price_start(price_list):
 
 
 def get_broad_color(color):
-    if color in ('Silver', 'Steel', 'Platinum'):
+    if not color:
+        return 'unknown'
+    elif color in ('Silver', 'Steel', 'Platinum'):
         return 'silver'
     elif color in ('Monaco White'):
         return 'white'
