@@ -14,6 +14,7 @@ from fast_api_als.constants import (
     HYU_DEALER_ENDPOINT_NAME,
     HYU_NO_DEALER_ENDPOINT_NAME
 )
+from fast_api_als.database import db_helper
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
@@ -23,6 +24,8 @@ from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.calculate_lead_hash import calculate_lead_hash
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.prep_data import conversion_to_ml_input_hyu_dealer, conversion_to_ml_input_hyu_no_dealer
+from fast_api_als.utils.quicksight_utils import create_quicksight_data
+from fast_api_als.quicksight import s3_helper
 
 router = APIRouter()
 logging.basicConfig(
@@ -47,6 +50,14 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     if not obj:
         logger.info(f"Error occured while parsing XML")
+        provider = db_helper.get_api_key_author(apikey)
+        obj = {
+            'provider': {
+                'service': provider
+            }
+        }
+        item, path = create_quicksight_data(obj, 'unknown_hash', 'REJECTED', '1_INVALID_XML')
+        s3_helper.put_file(item, path)
         return {
             "status": "REJECTED",
             "code": "1_INVALID_XML",
@@ -68,6 +79,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     logger.info(f"validation message: {validation_message}")
 
     if not validation_check:
+        item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, 'REJECTED', validation_code)
+        s3_helper.put_file(item, path)
         return {
             "status": "REJECTED",
             "code": validation_code,
