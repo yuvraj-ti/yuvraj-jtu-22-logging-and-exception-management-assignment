@@ -18,6 +18,7 @@ from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
 from fast_api_als.services.predict_score import ml_predict_score
+from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.calculate_lead_hash import calculate_lead_hash
 from fast_api_als.database.db_helper import db_helper_session
@@ -78,6 +79,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     # check if vendor is available here
     vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
     make = obj['adf']['prospect']['vehicle']['model']
+
     response_body = {}
     if vendor_available:
         ml_input = conversion_to_ml_input_hyu_dealer(model_input)
@@ -99,6 +101,12 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     email, phone, last_name = get_contact_details(obj)
     db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
+
+    if response_body['status'] == 'ACCEPTED':
+        contact_verified = await verify_phone_and_email(email, phone)
+        if not contact_verified:
+            response_body['status'] = 'REJECTED'
+            response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
 
     if response_body['status'] == 'ACCEPTED':
         lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name)
