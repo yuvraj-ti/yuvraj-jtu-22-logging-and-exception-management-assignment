@@ -1,5 +1,5 @@
-import xmltodict, json
-from jsonschema import Draft7Validator, validate, draft7_format_checker
+import xmltodict
+from jsonschema import validate, draft7_format_checker
 import logging
 from .adf_schema import schema
 import pgeocode

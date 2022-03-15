@@ -5,6 +5,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 from fast_api_als import constants
+from fast_api_als.utils.boto3_session import get_boto3_session
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,7 +73,7 @@ class DBHelper:
         )
         return res.get('Items', [])
 
-    def update_lead_conversion_status(self, uuid: str, oem: str, make: str, model: str ):
+    def update_lead_conversion_status(self, uuid: str, oem: str, make: str, model: str):
         res = self.table.get_item(
             Key={
                 'pk': f"{uuid}#{oem}"
@@ -82,7 +83,7 @@ class DBHelper:
         if not item:
             logger.info(f"No item found for {uuid}#{oem}#{make}#{model}")
             return False
-        item['gsisk'] = item['gsisk'][0]+"#"+"1"
+        item['gsisk'] = item['gsisk'][0] + "#" + "1"
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{uuid}#{oem}#{make}#{model}")
         return True
@@ -149,3 +150,7 @@ def verify_add_entry_response(response, data):
         logger.error(f"Failed to add {data} to the database.")
     else:
         logger.info("New entry added successfully.")
+
+
+session = get_boto3_session()
+db_helper_session = DBHelper(session)

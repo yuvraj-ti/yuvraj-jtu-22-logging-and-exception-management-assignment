@@ -9,8 +9,8 @@ deploy: check-environment-variables
 	sam package --s3-bucket ${SAM_BUCKET_NAME} --output-template-file packaged.yaml
 	sam deploy \
 	--template-file packaged.yaml \
-	--stack-name stateflow-resources \
+	--stack-name als-resources \
 	--capabilities CAPABILITY_IAM
 
 destroy:
-	aws cloudformation delete-stack --stack-name stateflow-resources
+	aws cloudformation delete-stack --stack-name als-resources

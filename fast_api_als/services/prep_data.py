@@ -1,4 +1,4 @@
-from .ml_init_data import columns_list_hyu_dealer, columns_list_hyu_no_dealer,\
+from fast_api_als.ml_init_data.HYU.ml_init_data import columns_list_hyu_dealer, columns_list_hyu_no_dealer,\
     initial_ml_input_hyu_no_dealer, initial_ml_input_hyu_dealer
 
 
