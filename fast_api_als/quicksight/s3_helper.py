@@ -1,7 +1,7 @@
 import logging
 import json
 from fast_api_als import constants
-
+from fast_api_als.utils.boto3_utils import get_boto3_client
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,3 +30,7 @@ def verify_response(response, data):
         logger.error(f"Failed to add {data} to the database.")
     else:
         logger.info(f"New entry {data} added successfully.")
+
+
+client = get_boto3_client('s3')
+s3_helper = S3Helper(client)
