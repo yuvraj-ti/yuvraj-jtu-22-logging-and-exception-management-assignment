@@ -143,6 +143,18 @@ class DBHelper:
         )
         return apikey
 
+    def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, oem: str):
+        item = {
+            'pk': uuid,
+            'gsipk': email,
+            'gsisk': uuid,
+            'gsipk1': f"{phone}#{last_name}",
+            'gsisk1': uuid,
+            'oem': oem
+        }
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
+
 
 def verify_add_entry_response(response, data):
     status_code = response['ResponseMetadata']['HTTPStatusCode']

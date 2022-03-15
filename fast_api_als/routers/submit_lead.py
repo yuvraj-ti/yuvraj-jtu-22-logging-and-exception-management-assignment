@@ -78,7 +78,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     logger.info(model_input)
     # check if vendor is available here
     vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
-    make = obj['adf']['prospect']['vehicle']['model']
 
     response_body = {}
     if vendor_available:
@@ -122,6 +121,11 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                       obj['adf']['prospect']['vehicle']['make']),
                                           lead_hash=lead_hash
                                           )
+        db_helper_session.insert_customer_lead(uuid=lead_uuid,
+                                               email=email,
+                                               phone=phone,
+                                               last_name=last_name,
+                                               oem=obj['adf']['prospect']['vehicle']['make'])
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
     logger.info(f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
