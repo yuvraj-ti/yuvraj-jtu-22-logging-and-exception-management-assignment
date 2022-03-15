@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     start = time.process_time()
     if not db_helper_session.verify_api_key(apikey):
+        logger.info(f"Wrong Api Key Received")
         raise HTTPException(
             status_code=HTTP_403_FORBIDDEN, detail="Wrong API Key"
         )
@@ -44,21 +45,23 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     obj = parse_xml(body)
 
     if not obj:
+        logger.info(f"Error occured while parsing XML")
         return {
             "status": "REJECTED",
             "code": "1_INVALID_XML",
             "message": "Error occured while parsing XML"
         }
-
+    logger.info(f"Adf file successfully parsed {obj}")
     lead_hash = calculate_lead_hash(obj)
+    logger.info(f"Lead hash calculated: {lead_hash}")
     duplicate_call, response = db_helper_session.check_duplicate_api_call(lead_hash,
                                                                           obj['adf']['prospect']['provider']['service'])
     if duplicate_call:
+        logger.info("Duplicate Api Call")
         return {
             "status": f"Already {response}",
             "message": "Duplicate Api Call"
         }
-
     validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
@@ -113,4 +116,5 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                           )
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
+    logger.info(f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
     return response_body
