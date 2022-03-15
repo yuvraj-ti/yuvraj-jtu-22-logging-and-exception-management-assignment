@@ -8,12 +8,12 @@ from fast_api_als.constants import (
     HYU_DEALER_ENDPOINT_NAME, HYU_NO_DEALER_ENDPOINT_NAME,
 )
 from fast_api_als.database.db_helper import db_helper_session
+from fast_api_als.services.alternate_verify_phone_and_email import alternate_verify_phone_and_email
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
 from fast_api_als.services.hyu_predictor import hyu_dealer_predictor, hyu_no_dealer_predictor
 from fast_api_als.services.predict_score import ml_predict_score, get_prediction
 from fast_api_als.services.prep_data import conversion_to_ml_input_hyu_dealer, conversion_to_ml_input_hyu_no_dealer
-from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.ml_init_data.HYU.ml_init_data import dummy_data
 from fast_api_als.services.authenticate import get_api_key
@@ -136,7 +136,11 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     email, phone, last_name = get_contact_details(obj)
 
     if response_body['status'] == 'ACCEPTED':
-        contact_verified = await verify_phone_and_email(email, phone)
+        # contact_verified = await verify_phone_and_email(email, phone)
+        start_time = time.time()
+        contact_verified = await alternate_verify_phone_and_email(email, phone)
+        process_time = time.time() - start_time
+        logger.info(f"Time Taken for validation {process_time*1000}")
         if not contact_verified:
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
