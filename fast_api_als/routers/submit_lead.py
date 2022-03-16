@@ -16,6 +16,7 @@ from fast_api_als.constants import (
 )
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
+from fast_api_als.services.enrich.demographic_data import get_customer_coordinate
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
 from fast_api_als.services.predict_score import ml_predict_score
 from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
@@ -74,10 +75,17 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "message": validation_message
         }
 
-    model_input = get_enriched_lead_json(obj)
-    logger.info(model_input)
     # check if vendor is available here
     vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
+    if not vendor_available:
+        lat, lon = get_customer_coordinate(obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
+        nearest_vendor = db_helper_session.fetch_nearest_dealer(oem=obj['adf']['prospect']['vehicle']['make'],
+                                                                lat=lat,
+                                                                lon=lon)
+        obj['adf']['prospect']['vendor'] = nearest_vendor
+
+    model_input = get_enriched_lead_json(obj, db_helper_session)
+    logger.info(model_input)
     make = obj['adf']['prospect']['vehicle']['model']
 
     response_body = {}
@@ -100,7 +108,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["code"] = "16_LOW_SCORE"
 
     email, phone, last_name = get_contact_details(obj)
-    db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
+    # db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
     if response_body['status'] == 'ACCEPTED':
         contact_verified = await verify_phone_and_email(email, phone)
