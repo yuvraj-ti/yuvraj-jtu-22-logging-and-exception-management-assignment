@@ -157,13 +157,12 @@ class DBHelper:
             "FilterExpression": "oem = :val1",
             "ExpressionAttributeValues": {
                 ":val1": {"S": oem},
-            },
-            "Limit": 1
+            }
         }
         res = self.geo_data_manager.queryRadius(
             dynamodbgeo.QueryRadiusRequest(
                 dynamodbgeo.GeoPoint(lat, lon),
-                2000,
+                50000,                                      # radius = 50km
                 query_input,
                 sort=True
             )
