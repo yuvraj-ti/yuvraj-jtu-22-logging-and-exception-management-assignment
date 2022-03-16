@@ -21,6 +21,7 @@ class DBHelper:
         self.ddb_resource = session.resource('dynamodb')
         self.table = self.ddb_resource.Table(constants.DB_TABLE_NAME)
         self.geo_data_manager = self.get_geo_data_manager()
+        self.dealer_table = self.ddb_resource.Table(constants.DEALER_DB_TABLE)
 
     def get_geo_data_manager(self):
         config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb'), constants.DEALER_DB_TABLE)
@@ -162,7 +163,7 @@ class DBHelper:
         res = self.geo_data_manager.queryRadius(
             dynamodbgeo.QueryRadiusRequest(
                 dynamodbgeo.GeoPoint(lat, lon),
-                100,
+                2000,
                 query_input,
                 sort=True
             )
@@ -181,6 +182,24 @@ class DBHelper:
             }
         }
         return dealer
+
+    def get_dealer_data(self, dealer_code: str, oem: str):
+        if not dealer_code:
+            return {}
+        res = self.dealer_table.query(
+            IndexName='delaercode-index',
+            KeyConditionExpression=Key('dealerCode').eq(dealer_code) & Key('oem').eq(oem)
+        )
+        res = res['Items']
+        if len(res) == 0:
+            return {}
+        res = res[0]
+        return {
+            'postalcode': res['dealerZip'],
+            'rating': res['Rating'],
+            'recommended': res['Recommended'],
+            'reviews': res['LifeTimeReviews']
+        }
 
 
 def verify_add_entry_response(response, data):
