@@ -108,7 +108,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["code"] = "16_LOW_SCORE"
 
     email, phone, last_name = get_contact_details(obj)
-    # db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
+    db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
     if response_body['status'] == 'ACCEPTED':
         contact_verified = await verify_phone_and_email(email, phone)
