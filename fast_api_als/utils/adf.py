@@ -17,6 +17,18 @@ match_iso8601 = re.compile(regex).match
 pg = pgeocode.Nominatim('US')
 
 
+def process_before_validating(input_json):
+    if isinstance(input_json['adf']['prospect']['id'], dict):
+        input_json['adf']['prospect']['id'] = [input_json['adf']['prospect']['id']]
+    if isinstance(input_json['adf']['prospect']['customer']['contact'].get('email', {}), str):
+        input_json['adf']['prospect']['customer']['contact']['email'] = {
+            '@preferredcontact': '0',
+            '#text': input_json['adf']['prospect']['customer']['contact']['email']
+        }
+    if isinstance(input_json['adf']['prospect']['vehicle'].get('price', []), dict):
+        input_json['adf']['prospect']['vehicle']['price'] = [input_json['adf']['prospect']['vehicle']['price']]
+
+
 def validate_iso8601(requestdate):
     try:
         if match_iso8601(requestdate) is not None:
@@ -83,6 +95,7 @@ def validate_adf_values(input_json):
 
 def check_validation(input_json):
     try:
+        process_before_validating(input_json)
         validate(
             instance=input_json,
             schema=schema,
