@@ -3,6 +3,7 @@ import logging
 
 import boto3
 from boto3.dynamodb.conditions import Key
+import dynamodbgeo
 
 from fast_api_als import constants
 from fast_api_als.utils.boto3_session import get_boto3_session
@@ -19,6 +20,12 @@ class DBHelper:
         self.session = session
         self.ddb_resource = session.resource('dynamodb')
         self.table = self.ddb_resource.Table(constants.DB_TABLE_NAME)
+        self.geo_data_manager = self.get_geo_data_manager()
+
+    def get_geo_data_manager(self):
+        config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb'), constants.DEALER_DB_TABLE)
+        geo_data_manager = dynamodbgeo.GeoDataManager(config)
+        return geo_data_manager
 
     def insert_lead(self, lead_hash: str, lead_provider: str, response: str):
         logger.info(f"Inserting lead from {lead_provider} with response as {response}")
@@ -142,6 +149,38 @@ class DBHelper:
             }
         )
         return apikey
+
+    def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
+
+        query_input = {
+            "FilterExpression": "oem = :val1",
+            "ExpressionAttributeValues": {
+                ":val1": {"S": oem},
+            },
+            "Limit": 1
+        }
+        res = self.geo_data_manager.queryRadius(
+            dynamodbgeo.QueryRadiusRequest(
+                dynamodbgeo.GeoPoint(lat, lon),
+                100,
+                query_input,
+                sort=True
+            )
+        )
+        if len(res) == 0:
+            return {}
+        res = res[0]
+        dealer = {
+            'id': {
+                '#text': res['dealerCode']['S']
+            },
+            'contact': {
+                'address': {
+                    'postalcode': res['dealerZip']['S']
+                }
+            }
+        }
+        return dealer
 
 
 def verify_add_entry_response(response, data):

@@ -7,6 +7,7 @@ ALS_AWS_REGION = os.getenv("ALS_AWS_REGION_NAME", "us-east-1")
 
 # DDB Constants
 DB_TABLE_NAME = os.getenv("ALS_DDB_TABLE_NAME", "auto-lead-scoring")
+DEALER_DB_TABLE = os.getenv("ALS_DEALER_DDB_TABLE_NAME", "als-dealer-table")
 
 # HYU Endpoint Constants
 HYU_DEALER_ENDPOINT_NAME = os.getenv('HYU_DEALER_ENDPOINT_NAME')
