@@ -10,11 +10,14 @@ from fast_api_als.services.enrich.demographic_data import find_demographic_data
 from fast_api_als.services.enrich.find_gender import find_gender
 
 
-def get_enriched_lead_json(adf_json: dict) -> dict:
-    distance_to_vendor = get_distance_to_vendor(
+def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
+    dealer_data = db_helper_session.get_dealer_data(
         adf_json['adf']['prospect'].get('vendor', {}).get('id', {}).get('#text', None),
-        adf_json['adf']['prospect']['customer']['contact']['address'][
-            'postalcode'])
+        adf_json['adf']['prospect']['vehicle']['make'])
+
+    distance_to_vendor = get_distance_to_vendor(dealer_data.get('postalcode', None),
+        adf_json['adf']['prospect']['customer']['contact']['address']['postalcode'])
+
     gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
     request_datetime = parser.parse(adf_json['adf']['prospect']['requestdate'])
     broad_color = get_broad_color(
@@ -66,9 +69,9 @@ def get_enriched_lead_json(adf_json: dict) -> dict:
         'Period': str(request_datetime.year) + '-' + str(request_datetime.month),
         "Model": adf_json['adf']['prospect']['vehicle']['model'],
         "Lead_Source": "hyundaiusa",
-        "Rating": "4.678555302965422",
-        "LifeTimeReviews": "228.7548938307518",
-        "Recommended": "95.71456599706488",
+        "Rating": dealer_data.get('rating',"4.678555302965422"),
+        "LifeTimeReviews":  dealer_data.get('reviews', "228.7548938307518"),
+        "Recommended": dealer_data.get('recommended', "95.71456599706488"),
         "SCR": "5.348490632243166",
         "OCR": "8.918993057558286"
     }
