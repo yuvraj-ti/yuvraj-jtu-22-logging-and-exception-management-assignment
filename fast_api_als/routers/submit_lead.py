@@ -75,7 +75,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         }
 
     email, phone, last_name = get_contact_details(obj)
-    if db_helper_session.check_duplicate_lead(email, phone, last_name):
+    if db_helper_session.check_duplicate_lead(email, phone, last_name, obj['adf']['prospect']['vehicle']['make'],
+                                              obj['adf']['prospect']['vehicle']['model']):
         return {
             "status": "REJECTED",
             "code": "12_DUPLICATE",
