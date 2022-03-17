@@ -125,13 +125,7 @@ class DBHelper:
             return False
         return True
 
-    def register_3PL(self, username: str):
-        res = self.table.query(
-            KeyConditionExpression=Key('pk').eq(username)
-        )
-        item = res.get('Items', [])
-        if len(item):
-            return None
+    def set_auth_key(self, username):
         apikey = uuid.uuid4().hex
         res = self.table.put_item(
             Item={
@@ -142,6 +136,15 @@ class DBHelper:
             }
         )
         return apikey
+
+    def register_3PL(self, username: str):
+        res = self.table.query(
+            KeyConditionExpression=Key('pk').eq(username)
+        )
+        item = res.get('Items', [])
+        if len(item):
+            return None
+        return self.set_auth_key(username)
 
     def set_make_model_oem(self, oem: str, make_model: str):
         item = self.fetch_oem_data(oem)

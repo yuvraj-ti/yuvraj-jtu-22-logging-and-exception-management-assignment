@@ -130,3 +130,20 @@ async def set_oem_threshold(request: Request):
     }
 
 
+@router.post("/reset_authkey")
+async def reset_authkey(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+
+    provider, authkey = body['3pl'], body['authkey']
+    if db_helper_session.verify_api_key(authkey):
+        apikey = db_helper_session.set_auth_key(username=provider)
+        return {
+            "status_code": HTTP_200_OK,
+            "x-api-key": apikey
+        }
+    else:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"apikey isn't valid")
+
