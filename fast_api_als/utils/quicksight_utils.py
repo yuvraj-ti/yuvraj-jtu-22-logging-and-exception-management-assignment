@@ -21,12 +21,7 @@ def create_quicksight_data(obj, lead_hash, status, code):
         "email_provided": 1 if obj.get('customer', {}).get('contact', {}).get('email', None) else 0,
         "phone_provided": 1 if obj.get('customer', {}).get('contact', {}).get('phone', None) else 0,
         "3pl": obj.get('provider', {}).get('service', 'unknown'),
-        "dealer": obj.get('vendor', {}).get('id', {}).get('#text', 'unknown')+"_"+obj.get('vendor', {}).get('vendorname', 'unknown')
+        "dealer": obj.get('vendor', {}).get('id', {}).get('#text', 'unknown') + "_" + obj.get('vendor', {}).get(
+            'vendorname', 'unknown')
     }
     return item, f"{obj.get('vehicle', {}).get('make', 'unknown')}/{item['epoch_timestamp']}_0_{lead_hash}"
-
-
-def get_user_role(token: str):
-    #TODO: Implement this function
-    # use cognito api to find user role using token
-    return "Admin"
