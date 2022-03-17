@@ -144,16 +144,26 @@ class DBHelper:
         return apikey
 
     def set_make_model_oem(self, oem: str, make_model: str):
+        item = self.fetch_oem_data(oem)
+        item['settings']['make_model'] = make_model
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, oem+make_model)
+
+    def fetch_oem_data(self, oem):
         res = self.table.get_item(
             Key={
                 'pk': f"OEM#{oem}",
                 'sk': "METADATA"
             }
         )
-        item = res['Item']
-        item['settings']['make_model'] = make_model
+        return res['Item']
+
+    def set_oem_threshold(self, oem: str, threshold: str):
+        item = self.fetch_oem_data(oem)
+        item['threshold'] = threshold
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem+make_model)
+        verify_add_entry_response(res, oem+threshold)
+
 
 
 def verify_add_entry_response(response, data):

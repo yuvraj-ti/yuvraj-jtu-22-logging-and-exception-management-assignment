@@ -105,7 +105,7 @@ async def registerUser(cred: Request):
 
 
 @router.post("/oem_setting")
-async def get_quicksight_url(request: Request):
+async def set_oem_setting(request: Request):
     body = await request.body()
     body = json.loads(body)
 
@@ -115,3 +115,18 @@ async def get_quicksight_url(request: Request):
         "status_code": HTTP_200_OK,
         "message": "settings updated"
     }
+
+
+@router.post("/threshold")
+async def set_oem_threshold(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+
+    oem, threshold = body['oem'], body['threshold']
+    db_helper_session.set_oem_threshold(oem, threshold)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": "settings updated"
+    }
+
+
