@@ -10,16 +10,9 @@ from fastapi.security.api_key import APIKey
 from starlette.status import HTTP_403_FORBIDDEN
 
 from fast_api_als.constants import SUPPORTED_OEMS
-from fast_api_als.constants import (
-    HYU_DEALER_ENDPOINT_NAME,
-    HYU_NO_DEALER_ENDPOINT_NAME
-)
-
-
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
-from fast_api_als.services.predict_score import ml_predict_score
 from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.calculate_lead_hash import calculate_lead_hash

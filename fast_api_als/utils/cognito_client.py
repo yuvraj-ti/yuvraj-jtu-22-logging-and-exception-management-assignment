@@ -1,3 +1,6 @@
+import logging
+from http.client import HTTPException
+
 import boto3
 from fast_api_als.constants import ALS_AWS_ACCESS_KEY, ALS_AWS_REGION, ALS_AWS_SECRET_KEY, ALS_USER_POOL_ID
 
@@ -29,7 +32,7 @@ def register_new_user(token: str, email: str, name: str, role: str):
         user_attribute[attr['Name']] = attr['Value']
 
     if user_attribute.get('custom:role', '') != "ADMIN":
-        return "Unauthorized"
+        return "Unauthorised"
 
     response = client.admin_create_user(
         UserPoolId=ALS_USER_POOL_ID,
@@ -45,4 +48,4 @@ def register_new_user(token: str, email: str, name: str, role: str):
             },
         ]
     )
-    return response
+    return "SUCCESS"

@@ -4,10 +4,10 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from fast_api_als.database.db_helper import db_helper_session
-from fast_api_als.utils.cognito_client import get_user_role
+from fast_api_als.utils.cognito_client import get_user_role, register_new_user
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
-from starlette.status import HTTP_200_OK
+from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
 
 from fastapi import Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_500_INTERNAL_SERVER_ERROR
@@ -81,3 +81,24 @@ async def get_quicksight_url(request: Request):
             detail=f"Failed to get the performance dashboard")
 
 
+@router.post("/registerUser")
+async def registerUser(cred: Request):
+    body = await cred.body()
+    body = json.loads(body)
+    email, token, role, name = body['email'], body['token'], body['role'], body['name']
+    if role not in ("OEM", "3PL", "ADMIN"):
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST
+        )
+    try:
+        response = register_new_user(token, email, name, role)
+        if response != "SUCCESS":
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED,
+                detail=f"Not Authorized")
+        return "SUCCESS"
+    except Exception as e:
+        logger.info(e)
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get the performance dashboard")
