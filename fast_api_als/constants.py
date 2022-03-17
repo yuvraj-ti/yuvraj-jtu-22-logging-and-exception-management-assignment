@@ -17,3 +17,12 @@ BMW_DEALER_ENDPOINT_NAME = os.getenv('BMW_DEALER_ENDPOINT_NAME')
 
 # Admin Constants
 SUPPORTED_OEMS = ["hyundai", "bmw"]
+
+# Data Tool 3rd Party Service Constants
+ALS_DATA_TOOL_REQUEST_KEY = os.getenv('ALS_DATA_TOOL_REQUEST_KEY')
+ALS_DATA_TOOL_SERVICE_URL = os.getenv('ALS_DATA_TOOL_SERVICE_URL')
+ALS_DATA_TOOL_PHONE_VERIFY_METHOD = os.getenv('ALS_DATA_TOOL_PHONE_VERIFY_METHOD')
+ALS_DATA_TOOL_EMAIL_VERIFY_METHOD = os.getenv('ALS_DATA_TOOL_EMAIL_VERIFY_METHOD')
+
+# S3 bucket for lead dumping
+S3_BUCKET_NAME = os.getenv("ALS_QUICKSIGHT_BUCKET_NAME", "auto-lead-scoring-quicksight")

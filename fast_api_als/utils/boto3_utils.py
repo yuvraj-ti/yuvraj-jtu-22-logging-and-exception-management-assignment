@@ -24,3 +24,22 @@ def get_boto3_session():
                             aws_secret_access_key=aws_secret_access_key)
 
     return session
+
+
+def get_boto3_client(service):
+    """
+    Create boto3 client for the provided service
+    Returns:
+        Returns boto3 client with given credentials
+    """
+    aws_region_name = ALS_AWS_REGION
+    aws_access_key_id = ALS_AWS_ACCESS_KEY
+    aws_secret_access_key = ALS_AWS_SECRET_KEY
+
+    client = boto3.client(service,
+                          region_name=aws_region_name,
+                          aws_access_key_id=aws_access_key_id,
+                          aws_secret_access_key=aws_secret_access_key,
+                          )
+
+    return client

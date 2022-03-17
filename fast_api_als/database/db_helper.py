@@ -5,7 +5,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 from fast_api_als import constants
-from fast_api_als.utils.boto3_session import get_boto3_session
+from fast_api_als.utils.boto3_utils import get_boto3_session
 
 logging.basicConfig(
     level=logging.INFO,
