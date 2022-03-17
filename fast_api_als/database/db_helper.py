@@ -1,6 +1,6 @@
 import uuid
 import logging
-
+import time
 import boto3
 from boto3.dynamodb.conditions import Key
 import dynamodbgeo
@@ -152,7 +152,6 @@ class DBHelper:
         return apikey
 
     def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
-
         query_input = {
             "FilterExpression": "oem = :val1",
             "ExpressionAttributeValues": {
@@ -186,7 +185,7 @@ class DBHelper:
         if not dealer_code:
             return {}
         res = self.dealer_table.query(
-            IndexName='delaercode-index',
+            IndexName='dealercode-index',
             KeyConditionExpression=Key('dealerCode').eq(dealer_code) & Key('oem').eq(oem)
         )
         res = res['Items']
