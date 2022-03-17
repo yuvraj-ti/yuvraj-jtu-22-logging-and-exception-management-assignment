@@ -79,21 +79,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
     # check if vendor is available here
-    vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
-    make = obj['adf']['prospect']['vehicle']['model']
-
-    response_body = {}
-    if vendor_available:
-        ml_input = conversion_to_ml_input_hyu_dealer(model_input)
-        logger.info(ml_input)
-        result = ml_predict_score(ml_input, HYU_DEALER_ENDPOINT_NAME)
-        # result = get_prediction(ml_input, hyu_dealer_predictor)
-    else:
-        ml_input = conversion_to_ml_input_hyu_no_dealer(model_input)
-        logger.info(ml_input)
-        result = ml_predict_score(ml_input, HYU_NO_DEALER_ENDPOINT_NAME)
-        # result = get_prediction(ml_input, hyu_no_dealer_predictor)
-
+    dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
     response_body = {}
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
     logger.info(ml_input)

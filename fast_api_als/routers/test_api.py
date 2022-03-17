@@ -117,23 +117,7 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
     # check if vendor is available here
-    vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
-    make = obj['adf']['prospect']['vehicle']['model']
-    response_body = {}
-    if vendor_available:
-        ml_input = conversion_to_ml_input_hyu_dealer(model_input)
-        logger.info(ml_input)
-
-        result = ml_predict_score(ml_input, HYU_DEALER_ENDPOINT_NAME)
-        logger.info(f"Result: {result}")
-        result = get_prediction(ml_input, hyu_dealer_predictor)
-        logger.info(f"Result: {result}")
-    else:
-        ml_input = conversion_to_ml_input_hyu_no_dealer(model_input)
-        logger.info(ml_input)
-        # result = ml_predict_score(ml_input, HYU_NO_DEALER_ENDPOINT_NAME)
-        result = get_prediction(ml_input, hyu_no_dealer_predictor)
-
+    dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
     response_body = {}
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
     logger.info(ml_input)
@@ -152,7 +136,7 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
         start_time = time.time()
         contact_verified = await alternate_verify_phone_and_email(email, phone)
         process_time = time.time() - start_time
-        logger.info(f"Time Taken for validation {process_time*1000}")
+        logger.info(f"Time Taken for validation {process_time * 1000}")
         if not contact_verified:
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
