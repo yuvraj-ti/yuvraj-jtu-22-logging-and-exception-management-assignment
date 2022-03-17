@@ -1,7 +1,7 @@
 import time
 
 from fastapi import FastAPI
-
+from fastapi.middleware.cors import CORSMiddleware
 from fast_api_als.routers import users, submit_lead, test_api
 
 app = FastAPI()
@@ -10,6 +10,14 @@ app.include_router(submit_lead.router)
 
 # only present during test development
 app.include_router(test_api.router)
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
