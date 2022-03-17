@@ -1,4 +1,11 @@
 import time
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)0.8s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 def create_quicksight_data(obj, lead_hash, status, code):
@@ -17,3 +24,9 @@ def create_quicksight_data(obj, lead_hash, status, code):
         "dealer": obj.get('vendor', {}).get('id', {}).get('#text', 'unknown')+"_"+obj.get('vendor', {}).get('vendorname', 'unknown')
     }
     return item, f"{obj.get('vehicle', {}).get('make', 'unknown')}/{item['epoch_timestamp']}_0_{lead_hash}"
+
+
+def get_user_role(token: str):
+    #TODO: Implement this function
+    # use cognito api to find user role using token
+    return "Admin"
