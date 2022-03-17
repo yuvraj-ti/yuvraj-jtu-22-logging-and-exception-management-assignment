@@ -5,12 +5,12 @@ import logging
 from starlette.status import HTTP_403_FORBIDDEN
 
 from fast_api_als.constants import (
-    HYU_DEALER_ENDPOINT_NAME, HYU_NO_DEALER_ENDPOINT_NAME,
+    HYU_DEALER_ENDPOINT_NAME, HYU_NO_DEALER_ENDPOINT_NAME, SUPPORTED_OEMS,
 )
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
+from fast_api_als.services.ml_helper import conversion_to_ml_input, score_ml_input, check_threshold
 from fast_api_als.services.predict_score import ml_predict_score
-from fast_api_als.services.prep_data import conversion_to_ml_input_hyu_dealer, conversion_to_ml_input_hyu_no_dealer
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.ml_init_data.HYU.ml_init_data import dummy_data
 from fast_api_als.services.authenticate import get_api_key
@@ -78,6 +78,7 @@ def predict():
 async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     start = time.process_time()
     if not db_helper_session.verify_api_key(apikey):
+        logger.info(f"Wrong Api Key Received")
         raise HTTPException(
             status_code=HTTP_403_FORBIDDEN, detail="Wrong API Key"
         )
@@ -87,12 +88,13 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     obj = parse_xml(body)
 
     if not obj:
+        logger.info(f"Error occured while parsing XML")
         return {
             "status": "REJECTED",
             "code": "1_INVALID_XML",
             "message": "Error occured while parsing XML"
         }
-
+    logger.info(f"Adf file successfully parsed {obj}")
     validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
@@ -103,25 +105,24 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
             "code": validation_code,
             "message": validation_message
         }
-
+    make = obj['adf']['prospect']['vehicle']['make']
+    if make.lower() not in SUPPORTED_OEMS:
+        return {
+            "status": "REJECTED",
+            "code": "19_OEM_NOT_SUPPORTED",
+            "message": f"Do not support OEM: {make}"
+        }
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
     # check if vendor is available here
-    vendor_available = True if obj['adf']['prospect'].get('vendor', None) else False
-    make = obj['adf']['prospect']['vehicle']['model']
-    response_body = {}
-    if vendor_available:
-        ml_input = conversion_to_ml_input_hyu_dealer(model_input)
-        logger.info(ml_input)
-        result = ml_predict_score(ml_input, HYU_DEALER_ENDPOINT_NAME)
-        # result = get_prediction(ml_input, hyu_dealer_predictor)
-    else:
-        ml_input = conversion_to_ml_input_hyu_no_dealer(model_input)
-        logger.info(ml_input)
-        result = ml_predict_score(ml_input, HYU_NO_DEALER_ENDPOINT_NAME)
-        # result = get_prediction(ml_input, hyu_no_dealer_predictor)
+    dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
 
-    if result > 0.083:
+    response_body = {}
+    ml_input = conversion_to_ml_input(model_input, make, dealer_available)
+    logger.info(ml_input)
+    result = score_ml_input(ml_input, make, dealer_available)
+    logger.info(f"ml score: {result}")
+    if check_threshold(result, make, dealer_available):
         response_body["status"] = "ACCEPTED"
         response_body["code"] = "0_ACCEPTED"
     else:
@@ -130,4 +131,6 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
+    logger.info(
+        f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
     return response_body

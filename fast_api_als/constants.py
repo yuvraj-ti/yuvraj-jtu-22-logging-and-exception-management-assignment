@@ -14,3 +14,6 @@ HYU_NO_DEALER_ENDPOINT_NAME = os.getenv('HYU_NO_DEALER_ENDPOINT_NAME')
 
 # BMW Endpoint Constants
 BMW_DEALER_ENDPOINT_NAME = os.getenv('BMW_DEALER_ENDPOINT_NAME')
+
+# Admin Constants
+SUPPORTED_OEMS = ["hyundai", "bmw"]
