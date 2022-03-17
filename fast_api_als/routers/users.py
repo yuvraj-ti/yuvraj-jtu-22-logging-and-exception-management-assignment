@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from fast_api_als.database.db_helper import db_helper_session
+from fast_api_als.utils.quicksight_utils import get_user_role
 
 router = APIRouter()
 import json
@@ -27,3 +28,11 @@ async def register3pl(cred: Request):
         "x-api-key": apikey,
         "message": "Include x-api-key in header"
     }
+
+
+@router.post("/dashboard")
+def get_quicksight_url(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+    user_role = get_user_role(request['token'])
+
