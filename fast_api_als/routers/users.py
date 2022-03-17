@@ -4,7 +4,8 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from fast_api_als.database.db_helper import db_helper_session
-from fast_api_als.utils.quicksight_utils import get_user_role, generate_dashboard_url
+from fast_api_als.utils.cognito_client import get_user_role
+from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
 from starlette.status import HTTP_200_OK
 
