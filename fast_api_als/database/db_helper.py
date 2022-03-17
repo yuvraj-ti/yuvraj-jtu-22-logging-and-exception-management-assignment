@@ -143,6 +143,18 @@ class DBHelper:
         )
         return apikey
 
+    def set_make_model_oem(self, oem: str, make_model: str):
+        res = self.table.get_item(
+            Key={
+                'pk': f"OEM#{oem}",
+                'sk': "METADATA"
+            }
+        )
+        item = res['Item']
+        item['settings']['make_model'] = make_model
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, oem+make_model)
+
 
 def verify_add_entry_response(response, data):
     status_code = response['ResponseMetadata']['HTTPStatusCode']

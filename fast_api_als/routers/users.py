@@ -102,3 +102,16 @@ async def registerUser(cred: Request):
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get the performance dashboard")
+
+
+@router.post("/oem_setting")
+async def get_quicksight_url(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+
+    oem, make_model = body['oem'], body['make_model']
+    db_helper_session.set_make_model_oem(oem, make_model)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": "settings updated"
+    }

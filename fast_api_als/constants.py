@@ -42,4 +42,3 @@ DASHBOARD_ARN = {
 }
 
 SESSION_LIFETIME = 600
-S3_BUCKET_NAME = 'auto-lead-scoring-quicksight'
