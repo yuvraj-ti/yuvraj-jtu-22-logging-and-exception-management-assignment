@@ -96,7 +96,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
     if response_body['status'] == 'ACCEPTED':
-        contact_verified = await verify_phone_and_email(email, phone)
+        contact_verified = await verify_phone_and_email(email["#text"], phone)
         if not contact_verified:
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'

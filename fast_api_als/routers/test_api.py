@@ -122,7 +122,7 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
     logger.info(ml_input)
     result = score_ml_input(ml_input, make, dealer_available)
-    logger.info(f"ml score: {result}")
+    logger.info(f"{make} ml score: {result}")
     if check_threshold(result, make, dealer_available):
         response_body["status"] = "ACCEPTED"
         response_body["code"] = "0_ACCEPTED"
@@ -134,7 +134,7 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     if response_body['status'] == 'ACCEPTED':
         # contact_verified = await verify_phone_and_email(email, phone)
         start_time = time.time()
-        contact_verified = await alternate_verify_phone_and_email(email, phone)
+        contact_verified = await alternate_verify_phone_and_email(email['#text'], phone)
         process_time = time.time() - start_time
         logger.info(f"Time Taken for validation {process_time * 1000}")
         if not contact_verified:
