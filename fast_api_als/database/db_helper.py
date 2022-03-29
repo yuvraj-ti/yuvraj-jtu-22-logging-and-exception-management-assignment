@@ -1,8 +1,9 @@
 import uuid
 import logging
-
+import time
 import boto3
 from boto3.dynamodb.conditions import Key
+import dynamodbgeo
 
 from fast_api_als import constants
 from fast_api_als.utils.boto3_utils import get_boto3_session
@@ -19,6 +20,13 @@ class DBHelper:
         self.session = session
         self.ddb_resource = session.resource('dynamodb')
         self.table = self.ddb_resource.Table(constants.DB_TABLE_NAME)
+        self.geo_data_manager = self.get_geo_data_manager()
+        self.dealer_table = self.ddb_resource.Table(constants.DEALER_DB_TABLE)
+
+    def get_geo_data_manager(self):
+        config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb'), constants.DEALER_DB_TABLE)
+        geo_data_manager = dynamodbgeo.GeoDataManager(config)
+        return geo_data_manager
 
     def insert_lead(self, lead_hash: str, lead_provider: str, response: str):
         logger.info(f"Inserting lead from {lead_provider} with response as {response}")
@@ -137,6 +145,7 @@ class DBHelper:
         )
         return apikey
 
+
     def register_3PL(self, username: str):
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(username)
@@ -167,6 +176,104 @@ class DBHelper:
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, oem+threshold)
 
+
+    def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
+        query_input = {
+            "FilterExpression": "oem = :val1",
+            "ExpressionAttributeValues": {
+                ":val1": {"S": oem},
+            }
+        }
+        res = self.geo_data_manager.queryRadius(
+            dynamodbgeo.QueryRadiusRequest(
+                dynamodbgeo.GeoPoint(lat, lon),
+                50000,                                      # radius = 50km
+                query_input,
+                sort=True
+            )
+        )
+        if len(res) == 0:
+            return {}
+        res = res[0]
+        dealer = {
+            'id': {
+                '#text': res['dealerCode']['S']
+            },
+            'contact': {
+                'address': {
+                    'postalcode': res['dealerZip']['S']
+                }
+            }
+        }
+        return dealer
+
+    def get_dealer_data(self, dealer_code: str, oem: str):
+        if not dealer_code:
+            return {}
+        res = self.dealer_table.query(
+            IndexName='dealercode-index',
+            KeyConditionExpression=Key('dealerCode').eq(dealer_code) & Key('oem').eq(oem)
+        )
+        res = res['Items']
+        if len(res) == 0:
+            return {}
+        res = res[0]
+        return {
+            'postalcode': res['dealerZip'],
+            'rating': res['Rating'],
+            'recommended': res['Recommended'],
+            'reviews': res['LifeTimeReviews']
+        }
+
+    def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, make: str, model: str):
+        item = {
+            'pk': uuid,
+            'sk': 'CUSTOMER_LEAD',
+            'gsipk': email,
+            'gsisk': uuid,
+            'gsipk1': f"{phone}#{last_name}",
+            'gsisk1': uuid,
+            'oem': make,
+            'make': make,
+            'model': model
+        }
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
+
+    def lead_exists(self, uuid: str, make: str, model: str):
+        lead_exist = False
+        if self.get_make_model_filter_status(make):
+            res = self.table.query(
+                KeyConditionExpression=Key('pk').eq(f"{uuid}#{make}") & Key('sk').eq(f"{make}#{model}")
+            )
+            if len(res['Items']):
+                lead_exist = True
+        else:
+            res = self.table.query(
+                KeyConditionExpression=Key('pk').eq(f"{uuid}#{make}")
+            )
+            if len(res['Items']):
+                lead_exist = True
+        return lead_exist
+
+    def check_duplicate_lead(self, email: str, phone: str, last_name: str, make: str, model: str):
+        email_attached_leads = self.table.query(
+            IndexName='gsi-index',
+            KeyConditionExpression=Key('gsipk').eq(email)
+        )
+        phone_attached_leads = self.table.query(
+            IndexName='gsi1-index',
+            KeyConditionExpression=Key('gsipk1').eq(f"{phone}#{last_name}")
+        )
+        customer_leads = set(email_attached_leads['Items'])
+        for item in phone_attached_leads['Items']:
+            customer_leads.add(item)
+
+        for item in customer_leads:
+            if self.lead_exists(item['pk'], make, model):
+                return True
+        logger.info(f"No duplicate lead for {email}#{phone}#{last_name}")
+        return False
 
 
 def verify_add_entry_response(response, data):
