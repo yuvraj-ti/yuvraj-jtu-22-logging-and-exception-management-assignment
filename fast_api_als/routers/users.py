@@ -9,7 +9,7 @@ from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
 from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
 
-from fastapi import Request, status
+from fastapi import Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_500_INTERNAL_SERVER_ERROR
 
 router = APIRouter()
@@ -41,7 +41,7 @@ async def register3pl(cred: Request):
     }
 
 
-@router.post("/dashboard", status_code=status.HTTP_200_OK)
+@router.post("/dashboard", status_code=HTTP_200_OK)
 async def get_quicksight_url(request: Request):
     body = await request.body()
     body = json.loads(body)
