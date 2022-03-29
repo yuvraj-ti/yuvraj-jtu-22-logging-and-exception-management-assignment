@@ -4,10 +4,10 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from fast_api_als.database.db_helper import db_helper_session
-from fast_api_als.utils.cognito_client import get_user_role
+from fast_api_als.utils.cognito_client import get_user_role, register_new_user
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
-from starlette.status import HTTP_200_OK
+from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
 
 from fastapi import Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_500_INTERNAL_SERVER_ERROR
@@ -41,7 +41,7 @@ async def register3pl(cred: Request):
     }
 
 
-@router.post("/dashboard")
+@router.post("/dashboard", status_code=HTTP_200_OK)
 async def get_quicksight_url(request: Request):
     body = await request.body()
     body = json.loads(body)
@@ -80,4 +80,70 @@ async def get_quicksight_url(request: Request):
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get the performance dashboard")
 
+
+@router.post("/registerUser")
+async def registerUser(cred: Request):
+    body = await cred.body()
+    body = json.loads(body)
+    email, token, role, name = body['email'], body['token'], body['role'], body['name']
+    if role not in ("OEM", "3PL", "ADMIN"):
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST
+        )
+    try:
+        response = register_new_user(token, email, name, role)
+        if response != "SUCCESS":
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED,
+                detail=f"Not Authorized")
+        return "SUCCESS"
+    except Exception as e:
+        logger.info(e)
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get the performance dashboard")
+
+
+@router.post("/oem_setting")
+async def set_oem_setting(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+
+    oem, make_model = body['oem'], body['make_model']
+    db_helper_session.set_make_model_oem(oem, make_model)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": "settings updated"
+    }
+
+
+@router.post("/threshold")
+async def set_oem_threshold(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+
+    oem, threshold = body['oem'], body['threshold']
+    db_helper_session.set_oem_threshold(oem, threshold)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": "settings updated"
+    }
+
+
+@router.post("/reset_authkey")
+async def reset_authkey(request: Request):
+    body = await request.body()
+    body = json.loads(body)
+
+    provider, authkey = body['3pl'], body['authkey']
+    if db_helper_session.verify_api_key(authkey):
+        apikey = db_helper_session.set_auth_key(username=provider)
+        return {
+            "status_code": HTTP_200_OK,
+            "x-api-key": apikey
+        }
+    else:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"apikey isn't valid")
 

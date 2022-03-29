@@ -133,13 +133,7 @@ class DBHelper:
             return False
         return True
 
-    def register_3PL(self, username: str):
-        res = self.table.query(
-            KeyConditionExpression=Key('pk').eq(username)
-        )
-        item = res.get('Items', [])
-        if len(item):
-            return None
+    def set_auth_key(self, username):
         apikey = uuid.uuid4().hex
         res = self.table.put_item(
             Item={
@@ -150,6 +144,38 @@ class DBHelper:
             }
         )
         return apikey
+
+
+    def register_3PL(self, username: str):
+        res = self.table.query(
+            KeyConditionExpression=Key('pk').eq(username)
+        )
+        item = res.get('Items', [])
+        if len(item):
+            return None
+        return self.set_auth_key(username)
+
+    def set_make_model_oem(self, oem: str, make_model: str):
+        item = self.fetch_oem_data(oem)
+        item['settings']['make_model'] = make_model
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, oem+make_model)
+
+    def fetch_oem_data(self, oem):
+        res = self.table.get_item(
+            Key={
+                'pk': f"OEM#{oem}",
+                'sk': "METADATA"
+            }
+        )
+        return res['Item']
+
+    def set_oem_threshold(self, oem: str, threshold: str):
+        item = self.fetch_oem_data(oem)
+        item['threshold'] = threshold
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, oem+threshold)
+
 
     def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
         query_input = {
