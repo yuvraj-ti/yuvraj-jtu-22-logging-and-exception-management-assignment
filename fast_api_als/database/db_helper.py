@@ -199,6 +199,56 @@ class DBHelper:
             'reviews': res['LifeTimeReviews']
         }
 
+    def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, make: str, model: str):
+        item = {
+            'pk': uuid,
+            'sk': 'CUSTOMER_LEAD',
+            'gsipk': email,
+            'gsisk': uuid,
+            'gsipk1': f"{phone}#{last_name}",
+            'gsisk1': uuid,
+            'oem': make,
+            'make': make,
+            'model': model
+        }
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
+
+    def lead_exists(self, uuid: str, make: str, model: str):
+        lead_exist = False
+        if self.get_make_model_filter_status(make):
+            res = self.table.query(
+                KeyConditionExpression=Key('pk').eq(f"{uuid}#{make}") & Key('sk').eq(f"{make}#{model}")
+            )
+            if len(res['Items']):
+                lead_exist = True
+        else:
+            res = self.table.query(
+                KeyConditionExpression=Key('pk').eq(f"{uuid}#{make}")
+            )
+            if len(res['Items']):
+                lead_exist = True
+        return lead_exist
+
+    def check_duplicate_lead(self, email: str, phone: str, last_name: str, make: str, model: str):
+        email_attached_leads = self.table.query(
+            IndexName='gsi-index',
+            KeyConditionExpression=Key('gsipk').eq(email)
+        )
+        phone_attached_leads = self.table.query(
+            IndexName='gsi1-index',
+            KeyConditionExpression=Key('gsipk1').eq(f"{phone}#{last_name}")
+        )
+        customer_leads = set(email_attached_leads['Items'])
+        for item in phone_attached_leads['Items']:
+            customer_leads.add(item)
+
+        for item in customer_leads:
+            if self.lead_exists(item['pk'], make, model):
+                return True
+        logger.info(f"No duplicate lead for {email}#{phone}#{last_name}")
+        return False
+
 
 def verify_add_entry_response(response, data):
     status_code = response['ResponseMetadata']['HTTPStatusCode']

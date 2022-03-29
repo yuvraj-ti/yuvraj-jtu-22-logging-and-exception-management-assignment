@@ -1,5 +1,5 @@
 def get_contact_details(obj):
-    email = obj['adf']['prospect']['customer']['contact'].get('email', '')
+    email = obj['adf']['prospect']['customer']['contact'].get('email', {}).get('#text', '')
     phone = obj['adf']['prospect']['customer']['contact'].get('phone', {}).get('#text', '')
     last_name = ''
     for part_name in obj['adf']['prospect']['customer']['contact']['name']:

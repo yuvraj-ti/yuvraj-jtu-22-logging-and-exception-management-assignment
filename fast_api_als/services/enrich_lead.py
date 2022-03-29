@@ -19,6 +19,11 @@ def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
         adf_json['adf']['prospect']['customer']['contact']['address']['postalcode'])
 
     gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
+    gender_cat = "unknown"
+    if gender_classification in ("m","?m"):
+        gender_cat = "male"
+    elif gender_classification in ("f","?f"):
+        gender_cat = "female"
     request_datetime = parser.parse(adf_json['adf']['prospect']['requestdate'])
     broad_color = get_broad_color(
         adf_json['adf']['prospect']['vehicle'].get('colorcombination', {}).get('exteriorcolor', None))
@@ -37,10 +42,12 @@ def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
     price_start = get_price_start(adf_json['adf']['prospect']['vehicle'].get('price', []))
     income, population_density = find_demographic_data(adf_json['adf']['prospect']['customer']['contact']['address'][
                                                            'postalcode'])
+    first_last_prop_case = 0
+    name_email_check = 1
     return {
         "DistanctToVendor": distance_to_vendor,
-        "FirstLastPropCase": 0,
-        "NameEmailCheck": 1,
+        "FirstLastPropCase": first_last_prop_case,
+        "NameEmailCheck": name_email_check,
         "SingleHour": request_datetime.hour,
         "SingleWeekday": calendar.day_name[request_datetime.weekday()],
         "lead_TimeFrameCont": adf_json['adf']['prospect']['customer'].get('timeframe', {}).get('description',
@@ -73,5 +80,13 @@ def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
         "LifeTimeReviews":  dealer_data.get('reviews', "228.7548938307518"),
         "Recommended": dealer_data.get('recommended', "95.71456599706488"),
         "SCR": "5.348490632243166",
-        "OCR": "8.918993057558286"
+        "OCR": "8.918993057558286",
+        "SCR_cat": "normal",  # BMW additional enrichment
+        "OCR_cat": "normal",
+        "Gender_cat": gender_cat,
+        "NamenMail_Proper": first_last_prop_case and name_email_check,
+        "Color_Selected": 0 if (broad_color is "unknown" and color_not_chosen == 0) else 1,
+        "ProperAddress": 1 if (address_check == 1 and street_address) else 0,
+        "EmailDomainCat_Ratio": "0.04438530340664647",
+        "lead_ProviderService_Ratio": "0.044290802250891076",
     }
