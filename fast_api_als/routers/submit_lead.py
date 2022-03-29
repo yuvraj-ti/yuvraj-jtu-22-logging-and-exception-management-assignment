@@ -19,7 +19,6 @@ from fast_api_als.constants import (
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
-from fast_api_als.services.predict_score import ml_predict_score
 from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.calculate_lead_hash import calculate_lead_hash
@@ -87,6 +86,19 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "code": validation_code,
             "message": validation_message
         }
+
+    email, phone, last_name = get_contact_details(obj)
+    if db_helper_session.check_duplicate_lead(email, phone, last_name, obj['adf']['prospect']['vehicle']['make'],
+                                              obj['adf']['prospect']['vehicle']['model']):
+        return {
+            "status": "REJECTED",
+            "code": "12_DUPLICATE",
+            "message": "This is a duplicate lead"
+        }
+
+    model_input = get_enriched_lead_json(obj)
+    logger.info(model_input)
+
     make = obj['adf']['prospect']['vehicle']['make']
     if make.lower() not in SUPPORTED_OEMS:
         return {
@@ -98,6 +110,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     logger.info(model_input)
     # check if vendor is available here
     dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
+
     response_body = {}
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
     logger.info(ml_input)
@@ -114,11 +127,10 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                         response_body['code'])
     s3_helper.put_file(item=item, path=path)
 
-    email, phone, last_name = get_contact_details(obj)
     db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
 
     if response_body['status'] == 'ACCEPTED':
-        contact_verified = await verify_phone_and_email(email["#text"], phone)
+        contact_verified = await verify_phone_and_email(email, phone)
         if not contact_verified:
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
@@ -137,6 +149,12 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                               obj['adf']['prospect']['vehicle']['make']),
                                           lead_hash=lead_hash
                                           )
+        db_helper_session.insert_customer_lead(uuid=lead_uuid,
+                                               email=email,
+                                               phone=phone,
+                                               last_name=last_name,
+                                               oem=obj['adf']['prospect']['vehicle']['make'],
+                                               model=obj['adf']['prospect']['vehicle']['model'])
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
     logger.info(
