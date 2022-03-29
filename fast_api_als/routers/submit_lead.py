@@ -10,14 +10,10 @@ from fastapi.security.api_key import APIKey
 from starlette.status import HTTP_403_FORBIDDEN
 
 from fast_api_als.constants import SUPPORTED_OEMS
-from fast_api_als.constants import (
-    HYU_DEALER_ENDPOINT_NAME,
-    HYU_NO_DEALER_ENDPOINT_NAME
-)
-
 
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
+from fast_api_als.services.enrich.demographic_data import get_customer_coordinate
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
 from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
@@ -87,8 +83,22 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "message": validation_message
         }
 
+    # check if vendor is available here
+    dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
     email, phone, last_name = get_contact_details(obj)
-    if db_helper_session.check_duplicate_lead(email, phone, last_name, obj['adf']['prospect']['vehicle']['make'],
+    make = obj['adf']['prospect']['vehicle']['make']
+
+    if not dealer_available:
+        lat, lon = get_customer_coordinate(obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
+        nearest_vendor = db_helper_session.fetch_nearest_dealer(oem=make,
+                                                                lat=lat,
+                                                                lon=lon)
+        obj['adf']['prospect']['vendor'] = nearest_vendor
+
+    model_input = get_enriched_lead_json(obj, db_helper_session)
+    logger.info(model_input)
+
+    if db_helper_session.check_duplicate_lead(email, phone, last_name, make,
                                               obj['adf']['prospect']['vehicle']['model']):
         return {
             "status": "REJECTED",
@@ -99,7 +109,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
 
-    make = obj['adf']['prospect']['vehicle']['make']
     if make.lower() not in SUPPORTED_OEMS:
         return {
             "status": "REJECTED",
@@ -108,8 +117,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         }
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
-    # check if vendor is available here
-    dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
 
     response_body = {}
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
@@ -138,22 +145,21 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     if response_body['status'] == 'ACCEPTED':
         lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name)
         db_helper_session.insert_oem_lead(uuid=lead_uuid,
-                                          make=obj['adf']['prospect']['vehicle']['make'],
+                                          make=make,
                                           model=obj['adf']['prospect']['vehicle']['model'],
                                           date=datetime.today().strftime('%Y-%m-%d'),
                                           email=email,
                                           phone=phone,
                                           last_name=last_name,
                                           timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
-                                          make_model_filter_status=db_helper_session.get_make_model_filter_status(
-                                              obj['adf']['prospect']['vehicle']['make']),
+                                          make_model_filter_status=db_helper_session.get_make_model_filter_status(make),
                                           lead_hash=lead_hash
                                           )
         db_helper_session.insert_customer_lead(uuid=lead_uuid,
                                                email=email,
                                                phone=phone,
                                                last_name=last_name,
-                                               oem=obj['adf']['prospect']['vehicle']['make'],
+                                               oem=make,
                                                model=obj['adf']['prospect']['vehicle']['model'])
     time_taken = (time.process_time() - start) * 1000
     response_body["message"] = f" {result} Response Time : {time_taken} ms"

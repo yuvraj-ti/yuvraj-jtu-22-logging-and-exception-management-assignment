@@ -8,13 +8,17 @@ from fast_api_als.services.enrich.customer_info import get_country_of_origin, ch
 from fast_api_als.services.enrich.dealer_data import get_distance_to_vendor
 from fast_api_als.services.enrich.demographic_data import find_demographic_data
 from fast_api_als.services.enrich.find_gender import find_gender
+from fast_api_als import constants
 
 
-def get_enriched_lead_json(adf_json: dict) -> dict:
-    distance_to_vendor = get_distance_to_vendor(
+def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
+    dealer_data = db_helper_session.get_dealer_data(
         adf_json['adf']['prospect'].get('vendor', {}).get('id', {}).get('#text', None),
-        adf_json['adf']['prospect']['customer']['contact']['address'][
-            'postalcode'])
+        adf_json['adf']['prospect']['vehicle']['make'])
+
+    distance_to_vendor = get_distance_to_vendor(dealer_data.get('postalcode', None),
+        adf_json['adf']['prospect']['customer']['contact']['address']['postalcode'])
+
     gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
     gender_cat = "unknown"
     if gender_classification in ("m","?m"):
@@ -73,17 +77,17 @@ def get_enriched_lead_json(adf_json: dict) -> dict:
         'Period': str(request_datetime.year) + '-' + str(request_datetime.month),
         "Model": adf_json['adf']['prospect']['vehicle']['model'],
         "Lead_Source": "hyundaiusa",
-        "Rating": "4.678555302965422",
-        "LifeTimeReviews": "228.7548938307518",
-        "Recommended": "95.71456599706488",
-        "SCR": "5.348490632243166",
-        "OCR": "8.918993057558286",
+        "Rating": dealer_data.get('rating',constants.DEALER_RATING),
+        "LifeTimeReviews":  dealer_data.get('reviews', constants.LIFETIMEREVIEWS),
+        "Recommended": dealer_data.get('recommended', constants.RECOMMENDED),
+        "SCR": constants.DEALER_SCR,
+        "OCR": constants.DEALER_OCR,
         "SCR_cat": "normal",  # BMW additional enrichment
         "OCR_cat": "normal",
         "Gender_cat": gender_cat,
         "NamenMail_Proper": first_last_prop_case and name_email_check,
         "Color_Selected": 0 if (broad_color is "unknown" and color_not_chosen == 0) else 1,
         "ProperAddress": 1 if (address_check == 1 and street_address) else 0,
-        "EmailDomainCat_Ratio": "0.04438530340664647",
-        "lead_ProviderService_Ratio": "0.044290802250891076",
+        "EmailDomainCat_Ratio": constants.EMAILDOMAINCAT_RATIO,
+        "lead_ProviderService_Ratio": constants.LEAD_PROVIDERSERVICE_RATION,
     }
