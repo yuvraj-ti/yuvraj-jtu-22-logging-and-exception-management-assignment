@@ -93,14 +93,13 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     email, phone, last_name = get_contact_details(obj)
     make = obj['adf']['prospect']['vehicle']['make']
 
-    # if dealer is not available find nearest dealer
+    # if dealer is not available then find nearest dealer
     if not dealer_available:
         lat, lon = get_customer_coordinate(obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
         nearest_vendor = db_helper_session.fetch_nearest_dealer(oem=make,
                                                                 lat=lat,
                                                                 lon=lon)
         obj['adf']['prospect']['vendor'] = nearest_vendor
-
 
     # check if the lead is duplicated
     if db_helper_session.check_duplicate_lead(email, phone, last_name, make,
@@ -109,14 +108,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             "status": "REJECTED",
             "code": "12_DUPLICATE",
             "message": "This is a duplicate lead"
-        }
-
-    # check if we support this OEM
-    if make.lower() not in SUPPORTED_OEMS:
-        return {
-            "status": "REJECTED",
-            "code": "19_OEM_NOT_SUPPORTED",
-            "message": f"Do not support OEM: {make}"
         }
 
     # enrich the lead
