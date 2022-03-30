@@ -22,6 +22,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+@router.post("/getUserRole")
+async def getUserRole(cred: Request, token: str = Depends(get_token)) -> object:
+    body = await cred.body()
+    body = json.loads(body)
+    name, role = get_user_role(token)
+    return {
+        "name": name,
+        "role": role
+    }
+
+
 @router.post("/register3PL")
 async def register3pl(cred: Request, token: str = Depends(get_token)):
     body = await cred.body()
@@ -171,4 +182,3 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail=f"apikey isn't valid")
-
