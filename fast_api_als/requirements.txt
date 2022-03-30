@@ -13,3 +13,4 @@ botocore==1.23.26
 httpx
 py3-validate-email
 phonenumbers
+dynamodbgeo
