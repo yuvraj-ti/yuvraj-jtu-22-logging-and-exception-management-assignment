@@ -1,5 +1,5 @@
 import pgeocode
-# dist = pgeocode.GeoDistance('US')
+dist = pgeocode.GeoDistance('US')
 
 
 def is_nan(x):

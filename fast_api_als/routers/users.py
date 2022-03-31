@@ -103,8 +103,8 @@ async def get_quicksight_url(request: Request, token: str = Depends(get_token)):
 async def register_user(cred: Request, token: str = Depends(get_token)):
     body = await cred.body()
     body = json.loads(body)
-    name, role = get_user_role(token)
-    if role != "ADMIN":
+    name, user_role = get_user_role(token)
+    if user_role != "ADMIN":
         return {
             "status": HTTP_401_UNAUTHORIZED,
             "message": "Unauthorised"
@@ -115,11 +115,13 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
             status_code=HTTP_400_BAD_REQUEST
         )
     try:
-        response = register_new_user(token, email, name, role)
+        response = register_new_user(email, name, role)
         if response != "SUCCESS":
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
                 detail=f"Not Authorized")
+        if role == "OEM":
+            db_helper_session.register_3PL(name)
         return "SUCCESS"
     except Exception as e:
         logger.info(e)

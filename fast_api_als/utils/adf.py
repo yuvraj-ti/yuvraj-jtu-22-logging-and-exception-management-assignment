@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # ISO8601 datetime regex
 regex = r'^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$'
 match_iso8601 = re.compile(regex).match
-# pg = pgeocode.Nominatim('US')
+pg = pgeocode.Nominatim('US')
 
 
 def process_before_validating(input_json):

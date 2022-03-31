@@ -20,18 +20,8 @@ def get_user_role(token: str):
     return user_attribute.get('custom:name', ''), user_attribute.get('custom:role', '')
 
 
-def register_new_user(token: str, email: str, name: str, role: str):
-    response = client.get_user(
-        AccessToken=token
-    )
-    user_attribute = {}
-    for attr in response['UserAttributes']:
-        user_attribute[attr['Name']] = attr['Value']
-
-    if user_attribute.get('custom:role', '') != "ADMIN":
-        return "Unauthorised"
-
-    response = client.admin_create_user(
+def register_new_user(email: str, name: str, role: str):
+    client.admin_create_user(
         UserPoolId=ALS_USER_POOL_ID,
         Username=email,
         UserAttributes=[
