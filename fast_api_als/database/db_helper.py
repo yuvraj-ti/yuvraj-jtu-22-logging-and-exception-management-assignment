@@ -133,6 +133,15 @@ class DBHelper:
             return False
         return True
 
+    def get_api_key(self, username: str):
+        res = self.table.query(
+            KeyConditionExpression=Key('pk').eq(username)
+        )
+        item = res['Items']
+        if len(item) == 0:
+            return "3PL doesn't exist"
+        return item[0]['sk']
+
     def set_auth_key(self, username):
         apikey = uuid.uuid4().hex
         res = self.table.put_item(

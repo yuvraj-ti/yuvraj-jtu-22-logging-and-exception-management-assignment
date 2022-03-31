@@ -5,7 +5,7 @@ import logging
 from starlette.status import HTTP_403_FORBIDDEN
 
 from fast_api_als.constants import (
-    HYU_DEALER_ENDPOINT_NAME, HYU_NO_DEALER_ENDPOINT_NAME, SUPPORTED_OEMS,
+    HYU_DEALER_ENDPOINT_NAME, SUPPORTED_OEMS,
 )
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.alternate_verify_phone_and_email import alternate_verify_phone_and_email

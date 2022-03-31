@@ -1,9 +1,10 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from fast_api_als.database.db_helper import db_helper_session
+from fast_api_als.services.authenticate import get_token
 from fast_api_als.utils.cognito_client import get_user_role, register_new_user
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
@@ -21,10 +22,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@router.post("/register3PL")
-async def register3pl(cred: Request):
+@router.post("/get_user_role")
+async def get_user_role(cred: Request, token: str = Depends(get_token)) -> object:
     body = await cred.body()
     body = json.loads(body)
+    name, role = get_user_role(token)
+    return {
+        "name": name,
+        "role": role
+    }
+
+
+@router.post("/register_3PL")
+async def register_3pl(cred: Request, token: str = Depends(get_token)):
+    body = await cred.body()
+    body = json.loads(body)
+    name, role = get_user_role(token)
+    if role != "ADMIN":
+        return {
+            "status": HTTP_401_UNAUTHORIZED,
+            "message": "Unauthorised"
+        }
     username, password = body['username'], body['password']
     apikey = db_helper_session.register_3PL(username)
 
@@ -42,10 +60,10 @@ async def register3pl(cred: Request):
 
 
 @router.post("/dashboard", status_code=HTTP_200_OK)
-async def get_quicksight_url(request: Request):
-    body = await request.body()
-    body = json.loads(body)
-    service_name, user_role = get_user_role(body['token'])
+async def get_quicksight_url(request: Request, token: str = Depends(get_token)):
+    # body = await request.body()
+    # body = json.loads(body)
+    service_name, user_role = get_user_role(token)
 
     dashboard_arn = constants.DASHBOARD_ARN.get(user_role)
     dashboard_id = constants.ADMIN_DASHBOARD_ID
@@ -81,11 +99,17 @@ async def get_quicksight_url(request: Request):
             detail=f"Failed to get the performance dashboard")
 
 
-@router.post("/registerUser")
-async def registerUser(cred: Request):
+@router.post("/register_user")
+async def register_user(cred: Request, token: str = Depends(get_token)):
     body = await cred.body()
     body = json.loads(body)
-    email, token, role, name = body['email'], body['token'], body['role'], body['name']
+    name, role = get_user_role(token)
+    if role != "ADMIN":
+        return {
+            "status": HTTP_401_UNAUTHORIZED,
+            "message": "Unauthorised"
+        }
+    email, role, name = body['email'], body['role'], body['name']
     if role not in ("OEM", "3PL", "ADMIN"):
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST
@@ -104,12 +128,16 @@ async def registerUser(cred: Request):
             detail=f"Failed to get the performance dashboard")
 
 
-@router.post("/oem_setting")
-async def set_oem_setting(request: Request):
+@router.post("/set_oem_setting")
+async def set_oem_setting(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
-
     oem, make_model = body['oem'], body['make_model']
+    name, role = get_user_role(token)
+    if role != "ADMIN" and (role != "OEM" or name != oem):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
     db_helper_session.set_make_model_oem(oem, make_model)
     return {
         "status_code": HTTP_200_OK,
@@ -117,12 +145,33 @@ async def set_oem_setting(request: Request):
     }
 
 
-@router.post("/threshold")
-async def set_oem_threshold(request: Request):
+@router.post("/view_oem_setting")
+async def view_oem_setting(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
+    oem = body['oem']
+    name, role = get_user_role(token)
+    if role != "ADMIN" and (role != "OEM" or name != oem):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    make_model_status = db_helper_session.get_make_model_filter_status(oem)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": make_model_status
+    }
 
+
+@router.post("/set_oem_threshold")
+async def set_oem_threshold(request: Request, token: str = Depends(get_token)):
+    body = await request.body()
+    body = json.loads(body)
     oem, threshold = body['oem'], body['threshold']
+    name, role = get_user_role(token)
+    if role != "ADMIN" and (role != "OEM" or name != oem):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
     db_helper_session.set_oem_threshold(oem, threshold)
     return {
         "status_code": HTTP_200_OK,
@@ -130,20 +179,54 @@ async def set_oem_threshold(request: Request):
     }
 
 
-@router.post("/reset_authkey")
-async def reset_authkey(request: Request):
+@router.post("/view_oem_threshold")
+async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
-
-    provider, authkey = body['3pl'], body['authkey']
-    if db_helper_session.verify_api_key(authkey):
-        apikey = db_helper_session.set_auth_key(username=provider)
-        return {
-            "status_code": HTTP_200_OK,
-            "x-api-key": apikey
-        }
-    else:
+    oem = body['oem']
+    name, role = get_user_role(token)
+    if role != "ADMIN" and (role != "OEM"):
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"apikey isn't valid")
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    oem_data = db_helper_session.fetch_oem_data(oem)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": oem_data['threshold']
+    }
 
+
+@router.post("/reset_authkey")
+async def reset_authkey(request: Request, token: str = Depends(get_token)):
+    body = await request.body()
+    body = json.loads(body)
+    provider, role = get_user_role(token)
+    if role != "ADMIN" and (role != "3PL"):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    if role == "ADMIN":
+        provider = body['3pl']
+    apikey = db_helper_session.set_auth_key(username=provider)
+    return {
+        "status_code": HTTP_200_OK,
+        "x-api-key": apikey
+    }
+
+
+@router.post("/view_authkey")
+async def view_authkey(request: Request, token: str = Depends(get_token)):
+    body = await request.body()
+    body = json.loads(body)
+    provider, role = get_user_role(token)
+    if role != "ADMIN" and role != "3PL":
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    if role == "ADMIN":
+        provider = body['3pl']
+    apikey = db_helper_session.set_auth_key(username=provider)
+    return {
+        "status_code": HTTP_200_OK,
+        "x-api-key": apikey
+    }
