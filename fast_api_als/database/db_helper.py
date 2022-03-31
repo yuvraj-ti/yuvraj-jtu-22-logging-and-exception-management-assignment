@@ -133,7 +133,7 @@ class DBHelper:
             return False
         return True
 
-    def get_api_key(self, username: str):
+    def get_auth_key(self, username: str):
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(username)
         )

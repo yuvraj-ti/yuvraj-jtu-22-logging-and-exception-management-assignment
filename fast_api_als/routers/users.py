@@ -225,7 +225,7 @@ async def view_authkey(request: Request, token: str = Depends(get_token)):
             detail=f"Not Authorized")
     if role == "ADMIN":
         provider = body['3pl']
-    apikey = db_helper_session.set_auth_key(username=provider)
+    apikey = db_helper_session.get_auth_key(username=provider)
     return {
         "status_code": HTTP_200_OK,
         "x-api-key": apikey
