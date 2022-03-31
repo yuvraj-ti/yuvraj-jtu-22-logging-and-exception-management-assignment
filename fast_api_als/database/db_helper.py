@@ -253,13 +253,13 @@ class DBHelper:
         lead_exist = False
         if self.get_make_model_filter_status(make):
             res = self.table.query(
-                KeyConditionExpression=Key('pk').eq(f"{uuid}#{make}") & Key('sk').eq(f"{make}#{model}")
+                KeyConditionExpression=Key('pk').eq(f"{make}#{uuid}") & Key('sk').eq(f"{make}#{model}")
             )
             if len(res['Items']):
                 lead_exist = True
         else:
             res = self.table.query(
-                KeyConditionExpression=Key('pk').eq(f"{uuid}#{make}")
+                KeyConditionExpression=Key('pk').eq(f"{make}#{uuid}")
             )
             if len(res['Items']):
                 lead_exist = True
@@ -274,9 +274,7 @@ class DBHelper:
             IndexName='gsi1-index',
             KeyConditionExpression=Key('gsipk1').eq(f"{phone}#{last_name}")
         )
-        customer_leads = set(email_attached_leads['Items'])
-        for item in phone_attached_leads['Items']:
-            customer_leads.add(item)
+        customer_leads = email_attached_leads['Items'] + phone_attached_leads['Items']
 
         for item in customer_leads:
             if self.lead_exists(item['pk'], make, model):

@@ -86,7 +86,7 @@ def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
         "OCR_cat": "normal",
         "Gender_cat": gender_cat,
         "NamenMail_Proper": first_last_prop_case and name_email_check,
-        "Color_Selected": 0 if (broad_color is "unknown" and color_not_chosen == 0) else 1,
+        "Color_Selected": 0 if (broad_color == "unknown" and color_not_chosen == 0) else 1,
         "ProperAddress": 1 if (address_check == 1 and street_address) else 0,
         "EmailDomainCat_Ratio": constants.EMAILDOMAINCAT_RATIO,
         "lead_ProviderService_Ratio": constants.LEAD_PROVIDERSERVICE_RATION,
