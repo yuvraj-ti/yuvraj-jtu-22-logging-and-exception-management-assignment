@@ -93,6 +93,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     email, phone, last_name = get_contact_details(obj)
     make = obj['adf']['prospect']['vehicle']['make']
 
+    logger.info(f"{dealer_available}::{email}:{phone}:{last_name}::{make}")
+
     # if dealer is not available then find nearest dealer
     if not dealer_available:
         lat, lon = get_customer_coordinate(obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
@@ -148,7 +150,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     # insert the lead into ddb with oem details
     if response_body['status'] == 'ACCEPTED':
-        lead_uuid = uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name)
+        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name))
         db_helper_session.insert_oem_lead(uuid=lead_uuid,
                                           make=make,
                                           model=obj['adf']['prospect']['vehicle']['model'],
@@ -164,7 +166,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                                email=email,
                                                phone=phone,
                                                last_name=last_name,
-                                               oem=make,
+                                               make=make,
                                                model=obj['adf']['prospect']['vehicle']['model'])
     time_taken = (time.process_time() - start) * 1000
 
