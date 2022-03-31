@@ -76,7 +76,7 @@ def validate_adf_values(input_json):
         return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "either phone or email is required"}
 
     # zipcode validation
-    res = pg.query_postal_code(zipcode)
+    res = pg.query_postal_code(zipcode.lstrip("0"))
     if is_nan(res['country_code']):
         return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
 
