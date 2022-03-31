@@ -136,6 +136,7 @@ async def set_oem_setting(request: Request, token: str = Depends(get_token)):
     body = json.loads(body)
     oem, make_model = body['oem'], body['make_model']
     name, role = get_user_role(token)
+    logger.info(f"Oem settings set by: {name}, {role} for {oem} ")
     if role != "ADMIN" and (role != "OEM" or name != oem):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
@@ -153,6 +154,7 @@ async def view_oem_setting(request: Request, token: str = Depends(get_token)):
     body = json.loads(body)
     oem = body['oem']
     name, role = get_user_role(token)
+    logger.info(f"Oem settings view by: {name}, {role} for {oem} ")
     if role != "ADMIN" and (role != "OEM" or name != oem):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
