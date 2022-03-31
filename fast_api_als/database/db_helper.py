@@ -142,8 +142,8 @@ class DBHelper:
             return "3PL doesn't exist"
         return item[0]['sk']
 
-    def set_auth_key(self, username):
-        apikey = uuid.uuid4().hex
+    def set_auth_key(self, username: str):
+        apikey = str(uuid.uuid4())
         res = self.table.put_item(
             Item={
                 'pk': username,
@@ -152,6 +152,7 @@ class DBHelper:
                 'gsisk': username
             }
         )
+        verify_add_entry_response(res, username)
         return apikey
 
 

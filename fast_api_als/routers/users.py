@@ -203,6 +203,7 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
     provider, role = get_user_role(token)
+    logger.info(f"Api key reset requested by {provider}: {role}")
     if role != "ADMIN" and (role != "3PL"):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
