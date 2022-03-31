@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/get_user_role")
-async def get_user_role(cred: Request, token: str = Depends(get_token)) -> object:
+async def get_user_info(cred: Request, token: str = Depends(get_token)) -> object:
     body = await cred.body()
     body = json.loads(body)
     name, role = get_user_role(token)
