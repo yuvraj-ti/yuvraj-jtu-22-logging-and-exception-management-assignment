@@ -28,6 +28,7 @@ ALS_DATA_TOOL_EMAIL_VERIFY_METHOD = os.getenv('ALS_DATA_TOOL_EMAIL_VERIFY_METHOD
 
 # S3 bucket for lead dumping
 S3_BUCKET_NAME = os.getenv("ALS_QUICKSIGHT_BUCKET_NAME", "auto-lead-scoring-quicksight")
+
 # Cognito Constants
 ALS_USER_POOL_ID = os.getenv('ALS_USER_POOL_ID')
 # Quicksight Dashboards
@@ -43,8 +44,6 @@ DASHBOARD_ARN = {
 }
 
 SESSION_LIFETIME = 600
-
-S3_BUCKET_NAME = 'auto-lead-scoring-quicksight'
 
 # Constant Median Data Values
 DEALER_RATING = "4.678555302965422"

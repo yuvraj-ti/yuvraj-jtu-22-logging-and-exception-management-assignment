@@ -5,6 +5,8 @@ from .adf_schema import schema
 import pgeocode
 import re
 
+from ..constants import SUPPORTED_OEMS
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)0.8s] %(message)s",
@@ -57,6 +59,7 @@ def validate_adf_values(input_json):
     email = input_json['customer']['contact'].get('email', None)
     phone = input_json['customer']['contact'].get('phone', None)
     names = input_json['customer']['contact']['name']
+    make = input_json['vehicle']['make']
 
     first_name, last_name = False, False
     for name_part in names:
@@ -90,6 +93,10 @@ def validate_adf_values(input_json):
     if not validate_iso8601(input_json['requestdate']):
         logger.info("Datetime is not in ISO8601 format")
         return {"status": "REJECTED", "code": "3_INVALID_FIELD", "message": "Invalid DateTime"}
+
+    # check if we support this OEM
+    if make.lower() not in SUPPORTED_OEMS:
+        return {"status": "REJECTED", "code": "19_OEM_NOT_SUPPORTED", "message": f"Do not support OEM: {make}"}
     return {"status": "OK"}
 
 
