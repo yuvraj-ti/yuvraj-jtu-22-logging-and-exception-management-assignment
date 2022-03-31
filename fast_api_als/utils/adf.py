@@ -83,6 +83,9 @@ def validate_adf_values(input_json):
     if "country code" in res and is_nan(res['country code']):
         return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
 
+    # if is_nan(res['country_code']):
+    #     return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
+
     # check for TCPA Consent
     tcpa_consent = False
     for id in input_json['id']:
