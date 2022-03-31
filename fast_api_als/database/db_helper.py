@@ -273,6 +273,16 @@ class DBHelper:
         logger.info(f"No duplicate lead for {email}#{phone}#{last_name}")
         return False
 
+    def get_api_key_author(self, apikey):
+        res = self.table.query(
+            IndexName='gsi-index',
+            KeyConditionExpression=Key('gsipk').eq(apikey)
+        )
+        item = res.get('Items', [])
+        if len(item) == 0:
+            return "unknown"
+        return item[0].get("pk", "unknown")
+
 
 def verify_add_entry_response(response, data):
     status_code = response['ResponseMetadata']['HTTPStatusCode']
