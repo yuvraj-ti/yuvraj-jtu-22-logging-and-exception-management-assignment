@@ -161,7 +161,10 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                           last_name=last_name,
                                           timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
                                           make_model_filter_status=db_helper_session.get_make_model_filter_status(make),
-                                          lead_hash=lead_hash
+                                          lead_hash=lead_hash,
+                                          dealer=obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                                          provider=obj['adf']['prospect']['provider']['service'],
+                                          postalcode=obj['adf']['prospect']['customer']['contact']['address']['postalcode']
                                           )
         db_helper_session.insert_customer_lead(uuid=lead_uuid,
                                                email=email,
