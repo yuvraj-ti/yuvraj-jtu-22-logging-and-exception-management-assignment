@@ -1,6 +1,6 @@
-from http.client import HTTPException
 
 import boto3
+from fastapi import HTTPException
 from starlette.status import HTTP_403_FORBIDDEN
 
 from fast_api_als.constants import ALS_AWS_ACCESS_KEY, ALS_AWS_REGION, ALS_AWS_SECRET_KEY, ALS_USER_POOL_ID
