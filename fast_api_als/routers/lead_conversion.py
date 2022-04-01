@@ -1,6 +1,7 @@
 import json
 from fastapi import APIRouter, Depends
 import logging
+import time
 
 from fastapi import Request
 from starlette import status
@@ -8,6 +9,7 @@ from starlette.exceptions import HTTPException
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from fast_api_als.database.db_helper import db_helper_session
+from fast_api_als.quicksight.s3_helper import s3_helper_client
 from fast_api_als.services.authenticate import get_token
 from fast_api_als.utils.cognito_client import get_user_role
 
@@ -20,7 +22,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# TODO: Handle OEM Authentication
+def get_quicksight_data(lead_uuid, item):
+    data = {
+        "lead_hash": lead_uuid,
+        "epoch_timestamp": int(time.time()),
+        "make": item['make'],
+        "model": item['model'],
+        "conversion": 1,
+        "postalcode": item.get('postalcode', 'unknown'),
+        "dealer": item.get('dealer', 'unknown'),
+        "3pl": item.get('3pl', 'unknown')
+    }
+    return data, f"1#{item['make']}#{item['model']}#{lead_uuid}"
+
+
 @router.post("/conversion/")
 async def submit(file: Request, token: str = Depends(get_token) ):
     body = await file.body()
@@ -35,8 +50,11 @@ async def submit(file: Request, token: str = Depends(get_token) ):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail=f"Not Authorized")
-    res = db_helper_session.update_lead_conversion(lead_uuid, oem, converted)
-    if res:
+
+    is_updated, item = db_helper_session.update_lead_conversion(lead_uuid, oem, converted)
+    if is_updated:
+        data, path = get_quicksight_data(lead_uuid, item)
+        s3_helper_client.put_file(item, path)
         return {
             "status_code": status.HTTP_200_OK,
             "message": "Lead Conversion Status Update"
