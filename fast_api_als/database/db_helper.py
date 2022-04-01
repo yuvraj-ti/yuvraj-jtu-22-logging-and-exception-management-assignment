@@ -81,21 +81,6 @@ class DBHelper:
         )
         return res.get('Items', [])
 
-    def update_lead_conversion_status(self, uuid: str, oem: str, make: str, model: str):
-        res = self.table.get_item(
-            Key={
-                'pk': f"{uuid}#{oem}"
-            }
-        )
-        item = res['Item']
-        if not item:
-            logger.info(f"No item found for {uuid}#{oem}#{make}#{model}")
-            return False
-        item['gsisk'] = item['gsisk'][0] + "#" + "1"
-        res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, f"{uuid}#{oem}#{make}#{model}")
-        return True
-
     def update_lead_sent_status(self, uuid: str, oem: str, make: str, model: str):
         res = self.table.get_item(
             Key={
@@ -185,7 +170,6 @@ class DBHelper:
         item['threshold'] = threshold
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, oem+threshold)
-
 
     def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
         query_input = {
@@ -292,6 +276,22 @@ class DBHelper:
         if len(item) == 0:
             return "unknown"
         return item[0].get("pk", "unknown")
+
+    def update_lead_conversion(self, lead_uuid: str, oem: str, converted: int):
+        res = self.table.query(
+            KeyConditionExpression=Key('pk').eq(f"{oem}#{lead_uuid}")
+        )
+        items = res.get('Items')
+        if len(items) == 0:
+            return False
+        item = items[0]
+        item['oem_responded'] = 1
+        item['conversion'] = converted
+        item['gsisk'] = f"1#{converted}"
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, item['pk'])
+        return True
+
 
 
 def verify_add_entry_response(response, data):

@@ -92,6 +92,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     dealer_available = True if obj['adf']['prospect'].get('vendor', None) else False
     email, phone, last_name = get_contact_details(obj)
     make = obj['adf']['prospect']['vehicle']['make']
+    model = obj['adf']['prospect']['vehicle']['model']
 
     logger.info(f"{dealer_available}::{email}:{phone}:{last_name}::{make}")
 
@@ -105,7 +106,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     # check if the lead is duplicated
     if db_helper_session.check_duplicate_lead(email, phone, last_name, make,
-                                              obj['adf']['prospect']['vehicle']['model']):
+                                              model):
         return {
             "status": "REJECTED",
             "code": "12_DUPLICATE",
@@ -150,10 +151,10 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     # insert the lead into ddb with oem details
     if response_body['status'] == 'ACCEPTED':
-        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name))
+        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name+make+model))
         db_helper_session.insert_oem_lead(uuid=lead_uuid,
                                           make=make,
-                                          model=obj['adf']['prospect']['vehicle']['model'],
+                                          model=model,
                                           date=datetime.today().strftime('%Y-%m-%d'),
                                           email=email,
                                           phone=phone,
@@ -167,7 +168,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                                phone=phone,
                                                last_name=last_name,
                                                make=make,
-                                               model=obj['adf']['prospect']['vehicle']['model'])
+                                               model=model)
     time_taken = (time.process_time() - start) * 1000
 
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
