@@ -15,14 +15,14 @@ def load_data():
                 "initial_ml_input": initial_ml_input_hyu_dealer,
                 "predictor": hyu_dealer_predictor,
                 "endpoint_name": HYU_DEALER_ENDPOINT_NAME,
-                "threshold": 0.083
+                "threshold": 0.023
             },
             "no-dealer": {
                 "columns": columns_list_hyu_no_dealer,
                 "initial_ml_input": initial_ml_input_hyu_no_dealer,
                 "predictor": hyu_no_dealer_predictor,
                 "endpoint_name": HYU_NO_DEALER_ENDPOINT_NAME,
-                "threshold": 0.083
+                "threshold": 0.023
             }
         },
         "bmw": {
