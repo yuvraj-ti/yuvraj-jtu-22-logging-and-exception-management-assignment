@@ -1,4 +1,8 @@
+from http.client import HTTPException
+
 import boto3
+from starlette.status import HTTP_403_FORBIDDEN
+
 from fast_api_als.constants import ALS_AWS_ACCESS_KEY, ALS_AWS_REGION, ALS_AWS_SECRET_KEY, ALS_USER_POOL_ID
 
 client = boto3.client(
@@ -11,9 +15,14 @@ client = boto3.client(
 
 def get_user_role(token: str):
     # use cognito api to find user role and name using token
-    response = client.get_user(
-        AccessToken=token
-    )
+    try:
+        response = client.get_user(
+            AccessToken=token
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN, detail="Could not validate credentials"
+        )
     user_attribute = {}
     for attr in response['UserAttributes']:
         user_attribute[attr['Name']] = attr['Value']
