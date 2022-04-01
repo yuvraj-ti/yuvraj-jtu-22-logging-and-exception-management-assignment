@@ -39,11 +39,12 @@ class DBHelper:
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
-                        timestamp: str, make_model_filter_status: str, lead_hash: str):
+                        timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,
+                        postalcode: str):
 
         item = {
             'pk': f"{make}#{uuid}",
-            'sk': f"{make}#{model}" if make_model_filter_status else "",
+            'sk': f"{make}#{model}",
             'gsipk': f"{make}#{date}",
             'gsisk': "0#0",
             'make': make,
@@ -52,9 +53,12 @@ class DBHelper:
             'phone': phone,
             'last_name': last_name,
             'timestamp': timestamp,
-            'conversion_status': "0",
+            'conversion': "0",
             "make_model_filter_status": make_model_filter_status,
-            "lead_hash": lead_hash
+            "lead_hash": lead_hash,
+            "dealer": dealer,
+            "3pl": provider,
+            "postalcode": postalcode
         }
 
         response = self.table.put_item(Item=item)
@@ -140,7 +144,6 @@ class DBHelper:
         verify_add_entry_response(res, username)
         return apikey
 
-
     def register_3PL(self, username: str):
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(username)
@@ -193,6 +196,7 @@ class DBHelper:
             'id': {
                 '#text': res['dealerCode']['S']
             },
+            'vendorname': res['dealerName']['S'],
             'contact': {
                 'address': {
                     'postalcode': res['dealerZip']['S']
@@ -283,15 +287,14 @@ class DBHelper:
         )
         items = res.get('Items')
         if len(items) == 0:
-            return False
+            return False, {}
         item = items[0]
         item['oem_responded'] = 1
         item['conversion'] = converted
         item['gsisk'] = f"1#{converted}"
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, item['pk'])
-        return True
-
+        return True, item
 
 
 def verify_add_entry_response(response, data):
