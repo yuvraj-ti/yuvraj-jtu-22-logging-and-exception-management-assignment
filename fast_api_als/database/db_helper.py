@@ -295,7 +295,6 @@ class DBHelper:
         verify_add_entry_response(res, item['pk'])
         return True, item
 
-
 def verify_add_entry_response(response, data):
     status_code = response['ResponseMetadata']['HTTPStatusCode']
     if not status_code == 200:
