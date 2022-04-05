@@ -43,6 +43,12 @@ async def register_3pl(cred: Request, token: str = Depends(get_token)):
             "status": HTTP_401_UNAUTHORIZED,
             "message": "Unauthorised"
         }
+    if 'username' not in body or 'password' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing username or password"
+        }
+
     username, password = body['username'], body['password']
     apikey = db_helper_session.register_3PL(username)
 
@@ -109,6 +115,12 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
             "status": HTTP_401_UNAUTHORIZED,
             "message": "Unauthorised"
         }
+    if 'email' not in body or 'role' not in body or 'name' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing email, role or name"
+        }
+
     email, role, name = body['email'], body['role'], body['name']
     if role not in ("OEM", "3PL", "ADMIN"):
         raise HTTPException(
@@ -134,6 +146,13 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
 async def set_oem_setting(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
+
+    if 'oem' not in body or 'make_model' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing OEM or make_model"
+        }
+
     oem, make_model = body['oem'], body['make_model']
     name, role = get_user_role(token)
     logger.info(f"Oem settings set by: {name}, {role} for {oem} ")
@@ -152,6 +171,13 @@ async def set_oem_setting(request: Request, token: str = Depends(get_token)):
 async def view_oem_setting(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
+
+    if 'oem' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing oem"
+        }
+
     oem = body['oem']
     name, role = get_user_role(token)
     logger.info(f"Oem settings view by: {name}, {role} for {oem} ")
@@ -170,6 +196,12 @@ async def view_oem_setting(request: Request, token: str = Depends(get_token)):
 async def set_oem_threshold(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
+
+    if 'oem' not in body or 'threshold' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing oem or threshold"
+        }
     oem, threshold = body['oem'], body['threshold']
     name, role = get_user_role(token)
     if role != "ADMIN" and (role != "OEM" or name != oem):
@@ -187,6 +219,13 @@ async def set_oem_threshold(request: Request, token: str = Depends(get_token)):
 async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
+
+    if 'oem' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing oem"
+        }
+
     oem = body['oem']
     name, role = get_user_role(token)
     if role != "ADMIN" and (role != "OEM"):

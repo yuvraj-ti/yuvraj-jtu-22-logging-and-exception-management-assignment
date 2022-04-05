@@ -4,9 +4,8 @@ import logging
 import time
 
 from fastapi import Request
-from starlette import status
 from starlette.exceptions import HTTPException
-from starlette.status import HTTP_401_UNAUTHORIZED
+from starlette import status
 
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.quicksight.s3_helper import s3_helper_client
@@ -41,6 +40,11 @@ async def submit(file: Request, token: str = Depends(get_token) ):
     body = await file.body()
     body = json.loads(str(body, 'utf-8'))
 
+    if 'lead_uuid' not in body or 'converted' not in body:
+        return {
+            "status": status.HTTP_400_BAD_REQUEST,
+            "message": "Missing lead_uuid or converted"
+        }
     lead_uuid = body['lead_uuid']
     converted = body['converted']
 
@@ -48,7 +52,7 @@ async def submit(file: Request, token: str = Depends(get_token) ):
     logger.info(f"Submit Lead conversion status: {oem}, {role} ")
     if role != "OEM":
         raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Not Authorized")
 
     is_updated, item = db_helper_session.update_lead_conversion(lead_uuid, oem, converted)
