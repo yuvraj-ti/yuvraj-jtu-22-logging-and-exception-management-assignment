@@ -9,6 +9,7 @@ from fast_api_als.utils.cognito_client import get_user_role, register_new_user
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
 from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
+from fast_api_als.utils.boto3_utils import get_boto3_session
 
 from fastapi import Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED, HTTP_500_INTERNAL_SERVER_ERROR
@@ -21,12 +22,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+session = get_boto3_session()
+cognito_client = session.client('cognito-idp')
+
 
 @router.post("/get_user_role")
 async def get_user_info(cred: Request, token: str = Depends(get_token)) -> object:
     body = await cred.body()
     body = json.loads(body)
-    name, role = get_user_role(token)
+    name, role = get_user_role(token, cognito_client)
     return {
         "name": name,
         "role": role
@@ -37,7 +41,7 @@ async def get_user_info(cred: Request, token: str = Depends(get_token)) -> objec
 async def register_3pl(cred: Request, token: str = Depends(get_token)):
     body = await cred.body()
     body = json.loads(body)
-    name, role = get_user_role(token)
+    name, role = get_user_role(token, cognito_client)
     if role != "ADMIN":
         return {
             "status": HTTP_401_UNAUTHORIZED,
@@ -109,7 +113,7 @@ async def get_quicksight_url(request: Request, token: str = Depends(get_token)):
 async def register_user(cred: Request, token: str = Depends(get_token)):
     body = await cred.body()
     body = json.loads(body)
-    name, user_role = get_user_role(token)
+    name, user_role = get_user_role(token, cognito_client)
     if user_role != "ADMIN":
         return {
             "status": HTTP_401_UNAUTHORIZED,
@@ -127,7 +131,7 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
             status_code=HTTP_400_BAD_REQUEST
         )
     try:
-        response = register_new_user(email, name, role)
+        response = register_new_user(email, name, role, cognito_client)
         if response != "SUCCESS":
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
@@ -154,7 +158,7 @@ async def set_oem_setting(request: Request, token: str = Depends(get_token)):
         }
 
     oem, make_model = body['oem'], body['make_model']
-    name, role = get_user_role(token)
+    name, role = get_user_role(token, cognito_client)
     logger.info(f"Oem settings set by: {name}, {role} for {oem} ")
     if role != "ADMIN" and (role != "OEM" or name != oem):
         raise HTTPException(
@@ -179,7 +183,7 @@ async def view_oem_setting(request: Request, token: str = Depends(get_token)):
         }
 
     oem = body['oem']
-    name, role = get_user_role(token)
+    name, role = get_user_role(token, cognito_client)
     logger.info(f"Oem settings view by: {name}, {role} for {oem} ")
     if role != "ADMIN" and (role != "OEM" or name != oem):
         raise HTTPException(
@@ -203,7 +207,7 @@ async def set_oem_threshold(request: Request, token: str = Depends(get_token)):
             "message": "Missing oem or threshold"
         }
     oem, threshold = body['oem'], body['threshold']
-    name, role = get_user_role(token)
+    name, role = get_user_role(token, cognito_client)
     if role != "ADMIN" and (role != "OEM" or name != oem):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
@@ -227,7 +231,7 @@ async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
         }
 
     oem = body['oem']
-    name, role = get_user_role(token)
+    name, role = get_user_role(token, cognito_client)
     if role != "ADMIN" and (role != "OEM"):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
@@ -243,7 +247,7 @@ async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
 async def reset_authkey(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
-    provider, role = get_user_role(token)
+    provider, role = get_user_role(token, cognito_client)
     logger.info(f"Api key reset requested by {provider}: {role}")
     if role != "ADMIN" and (role != "3PL"):
         raise HTTPException(
@@ -262,7 +266,7 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
 async def view_authkey(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
-    provider, role = get_user_role(token)
+    provider, role = get_user_role(token, cognito_client)
     if role != "ADMIN" and role != "3PL":
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
