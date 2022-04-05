@@ -137,8 +137,7 @@ class DBHelper:
             Item={
                 'pk': username,
                 'sk': apikey,
-                'gsipk': apikey,
-                'gsisk': username
+                'gsipk': apikey
             }
         )
         verify_add_entry_response(res, username)
