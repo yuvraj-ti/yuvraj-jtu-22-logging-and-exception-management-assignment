@@ -23,7 +23,12 @@ def get_boto3_session():
     session = boto3.Session(region_name=aws_region_name, aws_access_key_id=aws_access_key_id,
                             aws_secret_access_key=aws_secret_access_key)
 
-    return session
+    # check if credentials are valid
+    try:
+        session.client('sts').get_caller_identity()
+        return session
+    except Exception as e:
+        raise Exception('Invalid AWS credentials')
 
 
 def get_boto3_client(service):
