@@ -12,6 +12,16 @@ logger = logging.getLogger(__name__)
 
 
 def create_quicksight_data(obj, lead_hash, status, code):
+    """
+        Creates the data for dumping into S3.
+        Args:
+            obj: Lead Object
+            lead_hash: Lead hash
+            status: ACCEPTED or REJECTED
+            code: Response code
+        Returns:
+            S3 data
+    """
     item = {
         "lead_hash": lead_hash,
         "status": status,

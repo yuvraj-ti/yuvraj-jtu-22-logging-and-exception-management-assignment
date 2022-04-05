@@ -2,6 +2,14 @@ from fast_api_als.constants import ALS_USER_POOL_ID
 
 
 def get_user_role(token: str, cognito_client):
+    """
+        Finds the role from the token.
+        Args:
+            token: The token to find the role from.
+            cognito_client: The cognito client to use.
+        Returns:
+            The role of the user.
+    """
     # use cognito api to find user role and name using token
     response = cognito_client.get_user(
         AccessToken=token
@@ -13,7 +21,18 @@ def get_user_role(token: str, cognito_client):
 
 
 def register_new_user(email: str, name: str, role: str, cognito_client):
-    cognito_client.admin_create_user(
+    """
+        Registers a new user.
+    Args:
+        email: The email of the user.
+        name: The name of the user.
+        role:  The role of the user.
+        cognito_client: The cognito client to use.
+
+    Returns:
+        The success or reject response.
+    """
+    res = cognito_client.admin_create_user(
         UserPoolId=ALS_USER_POOL_ID,
         Username=email,
         UserAttributes=[
@@ -27,4 +46,7 @@ def register_new_user(email: str, name: str, role: str, cognito_client):
             },
         ]
     )
-    return "SUCCESS"
+    if res['ResponseMetadata']['HTTPStatusCode'] == 200:
+        return "SUCCESS"
+    else:
+        return "REJECT"
