@@ -43,7 +43,7 @@ def get_quicksight_data(lead_uuid, item):
     return data, f"1#{item['make']}#{item['model']}#{lead_uuid}"
 
 
-@router.post("/conversion/")
+@router.post("/conversion")
 async def submit(file: Request, token: str = Depends(get_token) ):
     body = await file.body()
     body = json.loads(str(body, 'utf-8'))

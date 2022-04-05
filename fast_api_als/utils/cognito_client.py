@@ -1,5 +1,10 @@
 from fast_api_als.constants import ALS_USER_POOL_ID
 
+from fastapi import HTTPException
+from starlette.status import HTTP_401_UNAUTHORIZED
+
+from fast_api_als.constants import ALS_AWS_ACCESS_KEY, ALS_AWS_REGION, ALS_AWS_SECRET_KEY, ALS_USER_POOL_ID
+
 
 def get_user_role(token: str, cognito_client):
     """
@@ -11,9 +16,15 @@ def get_user_role(token: str, cognito_client):
             The role of the user.
     """
     # use cognito api to find user role and name using token
-    response = cognito_client.get_user(
-        AccessToken=token
-    )
+
+    try:
+        response = cognito_client.get_user(
+            AccessToken=token
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials"
+        )
     user_attribute = {}
     for attr in response['UserAttributes']:
         user_attribute[attr['Name']] = attr['Value']
