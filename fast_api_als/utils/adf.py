@@ -76,11 +76,10 @@ def validate_adf_values(input_json):
         return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "either phone or email is required"}
 
     # zipcode validation
-    res = pg.query_postal_code(zipcode)
-    logger.info(res)
-    logger.info(zipcode)
-    # if is_nan(res['country_code']):
-    #     return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
+
+    res = pg.query_postal_code(zipcode.lstrip("0"))
+    if is_nan(res['country_code']):
+        return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
 
     # check for TCPA Consent
     tcpa_consent = False
