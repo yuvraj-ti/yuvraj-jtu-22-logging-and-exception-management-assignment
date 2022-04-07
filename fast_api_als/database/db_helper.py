@@ -295,6 +295,7 @@ class DBHelper:
         verify_add_entry_response(res, item['pk'])
         return True, item
 
+
 def verify_add_entry_response(response, data):
     status_code = response['ResponseMetadata']['HTTPStatusCode']
     if not status_code == 200:
@@ -305,3 +306,4 @@ def verify_add_entry_response(response, data):
 
 session = get_boto3_session()
 db_helper_session = DBHelper(session)
+db_helper_session.get_api_key_author("Initializing")

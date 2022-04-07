@@ -34,3 +34,4 @@ def verify_response(response, data):
 
 client = get_boto3_client('s3')
 s3_helper_client = S3Helper(client)
+s3_helper_client.put_file({}, 'initialize')
