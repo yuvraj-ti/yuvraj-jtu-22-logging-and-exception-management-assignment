@@ -1,5 +1,8 @@
 import calendar
+import time
+import logging
 from dateutil import parser
+from fast_api_als.database.db_helper import db_helper_session
 
 from fast_api_als.services.enrich.car_model_data import get_broad_color, get_color_not_chosen_value, get_cylinder, \
     get_transmission, get_price_start
@@ -10,14 +13,31 @@ from fast_api_als.services.enrich.demographic_data import find_demographic_data
 from fast_api_als.services.enrich.find_gender import find_gender
 from fast_api_als import constants
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)0.8s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
+
+def calculate_time(e_time):
+    elapsed_time = int(time.time()*1000.0) - e_time[0]
+    e_time[0] = int(time.time() * 1000.0)
+    return elapsed_time
+
+
+def get_enriched_lead_json(adf_json: dict) -> dict:
+    e_time = [int(time.time()*1000.0)]
     dealer_data = db_helper_session.get_dealer_data(
         adf_json['adf']['prospect'].get('vendor', {}).get('id', {}).get('#text', None),
         adf_json['adf']['prospect']['vehicle']['make'])
+    logger.info(f"Dealer data: {dealer_data}")
+    logger.info(f"Finding Dealer Data took {calculate_time(e_time)} ms")
 
     distance_to_vendor = get_distance_to_vendor(dealer_data.get('postalcode', None),
         adf_json['adf']['prospect']['customer']['contact']['address']['postalcode'])
+
+    logger.info(f"Finding Distance to Vendor took {calculate_time(e_time)} ms")
 
     gender_classification = find_gender(adf_json['adf']['prospect']['customer']['contact']['name'])
     gender_cat = "unknown"
@@ -41,8 +61,12 @@ def get_enriched_lead_json(adf_json: dict, db_helper_session) -> dict:
     cylinders = get_cylinder(trim)
     transmission = get_transmission(trim)
     price_start = get_price_start(adf_json['adf']['prospect']['vehicle'].get('price', []))
+
+    logger.info(f"Finding Rest other data directly from JSON took: {calculate_time(e_time)} ms")
     income, population_density = find_demographic_data(adf_json['adf']['prospect']['customer']['contact']['address'][
                                                            'postalcode'])
+
+    logger.info(f"Finding Demographic Data took: {calculate_time(e_time)} ms")
     first_last_prop_case = 0
     name_email_check = 1
     return {
