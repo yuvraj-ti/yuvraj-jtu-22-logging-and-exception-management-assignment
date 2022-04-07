@@ -1,9 +1,15 @@
+import asyncio
 import time
 import uuid
 
 from fastapi import APIRouter
 import logging
 from datetime import datetime
+import concurrent.futures
+from multiprocessing.dummy import Pool
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# pool = Pool(10)
 
 from starlette.status import HTTP_403_FORBIDDEN
 
@@ -273,17 +279,6 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["status"] = "REJECTED"
         response_body["code"] = "16_LOW_SCORE"
 
-    # create and dump data for quicksight analysis
-    item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
-                                        response_body['code'])
-    s3_helper_client.put_file(item=item, path=path)
-
-    logger.info(f"Putting in S3 took: {calculate_time(t1)} ms")
-
-    # store the lead response in ddb
-    db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
-    logger.info(f"Storing lead response in ddb took: {calculate_time(t1)} ms")
-
     # verify the customer
     if response_body['status'] == 'ACCEPTED':
         # contact_verified = await verify_phone_and_email(email, phone)
@@ -292,33 +287,40 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
         #     response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
         time.sleep(.500)
 
+    # Inserting all data parallely
+    # create and dump data for quicksight analysis
+    logger.info(f"Validating customer took: {calculate_time(t1)} ms")
+    item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
+                                        response_body['code'])
+
     # insert the lead into ddb with oem details
     if response_body['status'] == 'ACCEPTED':
         lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name+make+model))
-        db_helper_session.insert_oem_lead(uuid=lead_uuid,
-                                          make=make,
-                                          model=model,
-                                          date=datetime.today().strftime('%Y-%m-%d'),
-                                          email=email,
-                                          phone=phone,
-                                          last_name=last_name,
-                                          timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
-                                          make_model_filter_status=db_helper_session.get_make_model_filter_status(make),
-                                          lead_hash=lead_hash,
-                                          dealer=obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
-                                          provider=obj['adf']['prospect']['provider']['service'],
-                                          postalcode=obj['adf']['prospect']['customer']['contact']['address']['postalcode']
-                                          )
-        db_helper_session.insert_customer_lead(uuid=lead_uuid,
-                                               email=email,
-                                               phone=phone,
-                                               last_name=last_name,
-                                               make=make,
-                                               model=model)
-        logger.info(f"Storing OEM & Customer lead in ddb took: {calculate_time(t1)} ms")
+        make_model_filter = db_helper_session.get_make_model_filter_status(make)
+        logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(s3_helper_client.put_file, item, path),
+                       executor.submit(db_helper_session.insert_lead, lead_hash,
+                                       obj['adf']['prospect']['provider']['service'], response_body['status']),
+                       executor.submit(db_helper_session.insert_oem_lead, lead_uuid, make, model,
+                                       datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
+                                       datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
+                                       obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                                       obj['adf']['prospect']['provider']['service'],
+                                       obj['adf']['prospect']['customer']['contact']['address']['postalcode']),
+                       executor.submit(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
+                                       last_name, make, model)]
+        logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+    else:
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(s3_helper_client.put_file, item, path),
+                       executor.submit(db_helper_session.insert_lead, lead_hash,
+                                       obj['adf']['prospect']['provider']['service'], response_body['status'])]
+            logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
     time_taken = (int(time.time()*1000.0) - start)
 
-    response_body["message"] = f" {result} Response Time : {time_taken} ms"
+    response_body["message"] = f"{result} Response Time : {time_taken} ms"
     logger.info(
         f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
     return response_body
