@@ -22,6 +22,7 @@ class DBHelper:
         self.table = self.ddb_resource.Table(constants.DB_TABLE_NAME)
         self.geo_data_manager = self.get_geo_data_manager()
         self.dealer_table = self.ddb_resource.Table(constants.DEALER_DB_TABLE)
+        self.get_api_key_author("Initialize_Connection")
 
     def get_geo_data_manager(self):
         config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb'), constants.DEALER_DB_TABLE)
@@ -29,7 +30,8 @@ class DBHelper:
         return geo_data_manager
 
     def insert_lead(self, lead_hash: str, lead_provider: str, response: str):
-        logger.info(f"Inserting lead from {lead_provider} with response as {response}")
+        # logger.info(f"Inserting lead from {lead_provider} with response as {response}")
+        t1 = int(time.time() * 1000)
         item = {
             'pk': f'LEAD#{lead_hash}',
             'sk': lead_provider,
@@ -37,10 +39,12 @@ class DBHelper:
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
+        logger.info(f"Inserted lead from {lead_provider} with response as {response} took: {int(time.time() * 1000) - t1}ms")
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
                         timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,
                         postalcode: str):
+        t1 = int(time.time() * 1000)
 
         item = {
             'pk': f"{make}#{uuid}",
@@ -63,6 +67,7 @@ class DBHelper:
 
         response = self.table.put_item(Item=item)
         verify_add_entry_response(response, f"{make}#{email}#{phone}#{last_name}")
+        logger.info(f"Inserted oem lead for {make} {model} took: {int(time.time() * 1000) - t1}ms")
 
     def check_duplicate_api_call(self, lead_hash: str, lead_provider: str):
         res = self.table.get_item(
@@ -223,6 +228,7 @@ class DBHelper:
         }
 
     def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, make: str, model: str):
+        t1 = int(time.time()*1000.0)
         item = {
             'pk': uuid,
             'sk': 'CUSTOMER_LEAD',
@@ -236,6 +242,7 @@ class DBHelper:
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
+        logger.info(f"inserted customer lead {uuid} took: {int(time.time()*1000.0)-t1}ms")
 
     def lead_exists(self, uuid: str, make: str, model: str):
         lead_exist = False
@@ -306,4 +313,4 @@ def verify_add_entry_response(response, data):
 
 session = get_boto3_session()
 db_helper_session = DBHelper(session)
-db_helper_session.get_api_key_author("Initializing")
+
