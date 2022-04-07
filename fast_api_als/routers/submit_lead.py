@@ -114,7 +114,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         }
 
     # enrich the lead
-    model_input = get_enriched_lead_json(obj, db_helper_session)
+    model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
 
     # convert the enriched lead to ML input format
