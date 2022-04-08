@@ -2,7 +2,7 @@ import xmltodict
 from jsonschema import validate, draft7_format_checker
 import logging
 from .adf_schema import schema
-import pgeocode
+from uszipcode import SearchEngine
 import re
 
 from ..constants import SUPPORTED_OEMS
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # ISO8601 datetime regex
 regex = r'^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$'
 match_iso8601 = re.compile(regex).match
-pg = pgeocode.Nominatim('US')
+zipcode_search = SearchEngine()
 
 
 def process_before_validating(input_json):
@@ -76,15 +76,10 @@ def validate_adf_values(input_json):
         return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "either phone or email is required"}
 
     # zipcode validation
-    res = pg.query_postal_code(zipcode).to_dict()
-    logger.info(res)
-    if "country_code" in res and is_nan(res['country_code']):
+    res = zipcode_search.by_zipcode(zipcode)
+    logger.info(f"zipcode search results: {res}")
+    if not res:
         return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
-    if "country code" in res and is_nan(res['country code']):
-        return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
-
-    # if is_nan(res['country_code']):
-    #     return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
 
     # check for TCPA Consent
     tcpa_consent = False
