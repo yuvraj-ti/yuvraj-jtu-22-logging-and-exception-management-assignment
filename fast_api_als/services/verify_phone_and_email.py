@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 async def call_validation_service(url: str, topic: str, value: str, data: dict) -> None:  # 2
+    t1 = int(time.time()*1000.0)
+    logger.info(f"{topic} :{value} validation started at: {t1} ")
     if value == '':
         return
     async with httpx.AsyncClient() as client:  # 3
@@ -23,10 +25,11 @@ async def call_validation_service(url: str, topic: str, value: str, data: dict) 
 
     r = response.json()
     data[topic] = r
+    logger.info(f"{topic} :{value} validation finished at {int(time.time()*1000.0)} and took : {int(time.time()*1000.0)-t1} ms ")
 
 
 async def verify_phone_and_email(email: str, phone_number: str) -> bool:
-    start = time.process_time()
+    start = int(time.time()*1000.0)
     logger.info(f"Phone :{phone_number} and Email: {email} Validation started at: {start} ")
     email_validation_url = '{}?Method={}&RequestKey={}&EmailAddress={}&OutputFormat=json'.format(
         ALS_DATA_TOOL_SERVICE_URL,
@@ -41,6 +44,7 @@ async def verify_phone_and_email(email: str, phone_number: str) -> bool:
     email_valid = False
     phone_valid = False
     data = {}
+
     await asyncio.gather(
         call_validation_service(email_validation_url, "email", email, data),
         call_validation_service(phone_validation_url, "phone", phone_number, data),
@@ -52,5 +56,5 @@ async def verify_phone_and_email(email: str, phone_number: str) -> bool:
         if data["phone"]["DtResponse"]["Result"][0]["IsValid"] == "True":
             phone_valid = True
     logger.info(
-        f"isPhoneVerified :{phone_valid} and idEmailValid: {email_valid} finished at: {(time.process_time() - start) * 1000} ms ")
+        f"isPhoneVerified :{phone_valid} and idEmailValid: {email_valid} finished in: {int(time.time()*1000.0)-start} ms ")
     return email_valid | phone_valid
