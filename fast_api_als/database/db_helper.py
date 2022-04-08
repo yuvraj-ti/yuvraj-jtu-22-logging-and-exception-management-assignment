@@ -39,7 +39,8 @@ class DBHelper:
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
-        logger.info(f"Inserted lead from {lead_provider} with response as {response} took: {int(time.time() * 1000) - t1}ms")
+        logger.info(
+            f"Inserted lead from {lead_provider} with response as {response} took: {int(time.time() * 1000) - t1}ms")
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
                         timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,
@@ -78,9 +79,19 @@ class DBHelper:
         )
         item = res.get('Item')
         if not item:
-            return False, ""
+            return {
+                "Duplicate_Api_Call": {
+                    "status": False,
+                    "response": "No_Duplicate_Api_Call"
+                }
+            }
         else:
-            return True, item['response']
+            return {
+                "Duplicate_Api_Call": {
+                    "status": True,
+                    "response": item['response']
+                }
+            }
 
     def accepted_lead_not_sent_for_oem(self, oem: str, date: str):
         res = self.table.query(
@@ -161,7 +172,7 @@ class DBHelper:
         item = self.fetch_oem_data(oem)
         item['settings']['make_model'] = make_model
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem+make_model)
+        verify_add_entry_response(res, oem + make_model)
 
     def fetch_oem_data(self, oem):
         res = self.table.get_item(
@@ -176,7 +187,7 @@ class DBHelper:
         item = self.fetch_oem_data(oem)
         item['threshold'] = threshold
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem+threshold)
+        verify_add_entry_response(res, oem + threshold)
 
     def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
         query_input = {
@@ -188,7 +199,7 @@ class DBHelper:
         res = self.geo_data_manager.queryRadius(
             dynamodbgeo.QueryRadiusRequest(
                 dynamodbgeo.GeoPoint(lat, lon),
-                50000,                                      # radius = 50km
+                50000,  # radius = 50km
                 query_input,
                 sort=True
             )
@@ -228,7 +239,7 @@ class DBHelper:
         }
 
     def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, make: str, model: str):
-        t1 = int(time.time()*1000.0)
+        t1 = int(time.time() * 1000.0)
         item = {
             'pk': uuid,
             'sk': 'CUSTOMER_LEAD',
@@ -242,7 +253,7 @@ class DBHelper:
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
-        logger.info(f"inserted customer lead {uuid} took: {int(time.time()*1000.0)-t1}ms")
+        logger.info(f"inserted customer lead {uuid} took: {int(time.time() * 1000.0) - t1}ms")
 
     def lead_exists(self, uuid: str, make: str, model: str):
         lead_exist = False
@@ -273,9 +284,9 @@ class DBHelper:
 
         for item in customer_leads:
             if self.lead_exists(item['pk'], make, model):
-                return True
+                return {"Duplicate_Lead": True}
         logger.info(f"No duplicate lead for {email}#{phone}#{last_name}")
-        return False
+        return {"Duplicate_Lead": False}
 
     def get_api_key_author(self, apikey):
         res = self.table.query(
@@ -313,4 +324,3 @@ def verify_add_entry_response(response, data):
 
 session = get_boto3_session()
 db_helper_session = DBHelper(session)
-

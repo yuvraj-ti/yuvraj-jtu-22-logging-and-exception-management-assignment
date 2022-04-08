@@ -73,16 +73,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     logger.info(f"Lead hash calculated: {lead_hash}")
     logger.info(f"Lead hash verification took: {calculate_time(t1)} ms")
 
-    # check if 3PL is making a duplicate call
-    duplicate_call, response = db_helper_session.check_duplicate_api_call(lead_hash,
-                                                                          obj['adf']['prospect']['provider']['service'])
-    if duplicate_call:
-        logger.info("Duplicate Api Call")
-        return {
-            "status": f"Already {response}",
-            "message": "Duplicate Api Call"
-        }
-
     # check if adf xml is valid
     validation_check, validation_code, validation_message = check_validation(obj)
 
@@ -106,6 +96,26 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     logger.info(f"{dealer_available}::{email}:{phone}:{last_name}::{make}")
 
+    # check if 3PL is making a duplicate call or it is a duplicate lead
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(db_helper_session.check_duplicate_api_call, lead_hash, obj['adf']['prospect']['provider']['service']),
+                   executor.submit(db_helper_session.check_duplicate_lead, email, phone, last_name, make, model)
+                   ]
+        for future in as_completed(futures):
+            result = future.result()
+            if result.get('Duplicate_Api_Call', {}).get('status', False):
+                return {
+                    "status": f"Already {result['Duplicate_Api_Call']['response']}",
+                    "message": "Duplicate Api Call"
+                }
+            if result.get('Duplicate_Lead', False):
+                return {
+                    "status": "REJECTED",
+                    "code": "12_DUPLICATE",
+                    "message": "This is a duplicate lead"
+                }
+    logger.info(f"Duplicate check took: {calculate_time(t1)} ms")
+
     # if dealer is not available then find nearest dealer
     if not dealer_available:
         lat, lon = get_customer_coordinate(obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
@@ -115,23 +125,16 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         obj['adf']['prospect']['vendor'] = nearest_vendor
         logger.info(f"Finding nearest dealer took: {calculate_time(t1)} ms")
 
-    # check if the lead is duplicated
-    if db_helper_session.check_duplicate_lead(email, phone, last_name, make,
-                                              model):
-        return {
-            "status": "REJECTED",
-            "code": "12_DUPLICATE",
-            "message": "This is a duplicate lead"
-        }
 
     # enrich the lead
     model_input = get_enriched_lead_json(obj)
     logger.info(model_input)
+    logger.info(f"Enriching lead took: {calculate_time(t1)} ms")
 
     # convert the enriched lead to ML input format
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
     logger.info(ml_input)
-    logger.info(f"Enriching lead took: {calculate_time(t1)} ms")
+    logger.info(f"Converting to ML input took: {calculate_time(t1)} ms")
 
     # score the lead
     result = score_ml_input(ml_input, make, dealer_available)
