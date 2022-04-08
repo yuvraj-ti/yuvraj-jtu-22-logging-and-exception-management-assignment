@@ -126,6 +126,7 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
                                                                 lat=lat,
                                                                 lon=lon)
         obj['adf']['prospect']['vendor'] = nearest_vendor
+        dealer_available = True if nearest_vendor != {} else False
         logger.info(f"Finding nearest dealer took: {calculate_time(t1)} ms")
 
     # enrich the lead

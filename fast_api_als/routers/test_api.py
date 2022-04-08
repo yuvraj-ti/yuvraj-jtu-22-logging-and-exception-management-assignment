@@ -2,7 +2,7 @@ import asyncio
 import time
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 import logging
 from datetime import datetime
 import concurrent.futures
@@ -169,7 +169,7 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
 
 # api for load testing ( do not use 3rd party service and do not check for duplicate api calls )
 @router.post("/submit_load/")
-async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
+async def submit1(file: Request, background_tasks: BackgroundTasks, apikey: APIKey = Depends(get_api_key)):
     start = int(time.time()*1000.0)
     t1 = [int(time.time()*1000.0)]
     if not db_helper_session.verify_api_key(apikey):
@@ -295,30 +295,27 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     # insert the lead into ddb with oem details
     if response_body['status'] == 'ACCEPTED':
-        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name+make+model))
+        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
         make_model_filter = db_helper_session.get_make_model_filter_status(make)
         logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
-
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(s3_helper_client.put_file, item, path),
-                       executor.submit(db_helper_session.insert_lead, lead_hash,
-                                       obj['adf']['prospect']['provider']['service'], response_body['status']),
-                       executor.submit(db_helper_session.insert_oem_lead, lead_uuid, make, model,
-                                       datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
-                                       datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
-                                       obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
-                                       obj['adf']['prospect']['provider']['service'],
-                                       obj['adf']['prospect']['customer']['contact']['address']['postalcode']),
-                       executor.submit(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
-                                       last_name, make, model)]
+        background_tasks.add_task(s3_helper_client.put_file, item, path)
+        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
+                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
+        background_tasks.add_task(db_helper_session.insert_oem_lead, lead_uuid, make, model,
+                                  datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
+                                  datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
+                                  obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                                  obj['adf']['prospect']['provider']['service'],
+                                  obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
+        background_tasks.add_task(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
+                                  last_name, make, model)
         logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
     else:
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(s3_helper_client.put_file, item, path),
-                       executor.submit(db_helper_session.insert_lead, lead_hash,
-                                       obj['adf']['prospect']['provider']['service'], response_body['status'])]
-            logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
-    time_taken = (int(time.time()*1000.0) - start)
+        background_tasks.add_task(s3_helper_client.put_file, item, path)
+        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
+                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
+        logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+    time_taken = (int(time.time() * 1000.0) - start)
 
     response_body["message"] = f"{result} Response Time : {time_taken} ms"
     logger.info(
