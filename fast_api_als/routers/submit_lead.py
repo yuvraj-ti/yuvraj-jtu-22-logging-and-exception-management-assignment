@@ -1,6 +1,6 @@
 import time
 import uuid
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 import logging
 
 from datetime import datetime
@@ -9,7 +9,6 @@ from fastapi import Request, HTTPException, Depends
 from fastapi.security.api_key import APIKey
 from starlette.status import HTTP_403_FORBIDDEN
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
@@ -32,13 +31,13 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_time(t1):
-    elapsed_time = int(time.time()*1000.0) - t1[0]
-    t1[0] = int(time.time()*1000.0)
+    elapsed_time = int(time.time() * 1000.0) - t1[0]
+    t1[0] = int(time.time() * 1000.0)
     return elapsed_time
 
 
 @router.post("/submit/")
-async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
+async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKey = Depends(get_api_key)):
     start = int(time.time() * 1000.0)
     t1 = [int(time.time() * 1000.0)]
     if not db_helper_session.verify_api_key(apikey):
@@ -99,7 +98,8 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
 
     # check if 3PL is making a duplicate call or it is a duplicate lead
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(db_helper_session.check_duplicate_api_call, lead_hash, obj['adf']['prospect']['provider']['service']),
+        futures = [executor.submit(db_helper_session.check_duplicate_api_call, lead_hash,
+                                   obj['adf']['prospect']['provider']['service']),
                    executor.submit(db_helper_session.check_duplicate_lead, email, phone, last_name, make, model)
                    ]
         for future in as_completed(futures):
@@ -127,7 +127,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                                                 lon=lon)
         obj['adf']['prospect']['vendor'] = nearest_vendor
         logger.info(f"Finding nearest dealer took: {calculate_time(t1)} ms")
-
 
     # enrich the lead
     model_input = get_enriched_lead_json(obj)
@@ -170,31 +169,26 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
         make_model_filter = db_helper_session.get_make_model_filter_status(make)
         logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
-
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(s3_helper_client.put_file, item, path),
-                       executor.submit(db_helper_session.insert_lead, lead_hash,
-                                       obj['adf']['prospect']['provider']['service'], response_body['status']),
-                       executor.submit(db_helper_session.insert_oem_lead, lead_uuid, make, model,
-                                       datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
-                                       datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
-                                       obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
-                                       obj['adf']['prospect']['provider']['service'],
-                                       obj['adf']['prospect']['customer']['contact']['address']['postalcode']),
-                       executor.submit(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
-                                       last_name, make, model)]
+        background_tasks.add_task(s3_helper_client.put_file, item, path)
+        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
+                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
+        background_tasks.add_task(db_helper_session.insert_oem_lead, lead_uuid, make, model,
+                                  datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
+                                  datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
+                                  obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                                  obj['adf']['prospect']['provider']['service'],
+                                  obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
+        background_tasks.add_task(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
+                                  last_name, make, model)
         logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
     else:
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(s3_helper_client.put_file, item, path),
-                       executor.submit(db_helper_session.insert_lead, lead_hash,
-                                       obj['adf']['prospect']['provider']['service'], response_body['status'])]
-            logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
-    time_taken = (int(time.time()*1000.0) - start)
+        background_tasks.add_task(s3_helper_client.put_file, item, path)
+        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
+                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
+        logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+    time_taken = (int(time.time() * 1000.0) - start)
 
     response_body["message"] = f"{result} Response Time : {time_taken} ms"
     logger.info(
         f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
     return response_body
-
-
