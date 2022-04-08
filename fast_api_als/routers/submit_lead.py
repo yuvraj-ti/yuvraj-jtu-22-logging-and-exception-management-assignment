@@ -8,8 +8,8 @@ from datetime import datetime
 from fastapi import Request, HTTPException, Depends
 from fastapi.security.api_key import APIKey
 from starlette.status import HTTP_403_FORBIDDEN
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from fast_api_als.constants import SUPPORTED_OEMS
 
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
@@ -30,10 +30,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def calculate_time(t1):
+    elapsed_time = int(time.time()*1000.0) - t1[0]
+    t1[0] = int(time.time()*1000.0)
+    return elapsed_time
+
 
 @router.post("/submit/")
 async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
-    start = time.process_time()
+    start = int(time.time() * 1000.0)
+    t1 = [int(time.time() * 1000.0)]
     if not db_helper_session.verify_api_key(apikey):
         logger.info(f"Wrong Api Key Received")
         raise HTTPException(
@@ -42,7 +48,9 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     body = await file.body()
     body = str(body, 'utf-8')
 
+    logger.info(f"input body to XML took: {calculate_time(t1)} ms")
     obj = parse_xml(body)
+    logger.info(f"XML verification took parsed: {calculate_time(t1)} ms")
 
     # check if xml is not parsable
     if not obj:
@@ -63,6 +71,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     logger.info(f"Adf file successfully parsed {obj}")
     lead_hash = calculate_lead_hash(obj)
     logger.info(f"Lead hash calculated: {lead_hash}")
+    logger.info(f"Lead hash verification took: {calculate_time(t1)} ms")
 
     # check if 3PL is making a duplicate call
     duplicate_call, response = db_helper_session.check_duplicate_api_call(lead_hash,
@@ -78,6 +87,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     validation_check, validation_code, validation_message = check_validation(obj)
 
     logger.info(f"validation message: {validation_message}")
+    logger.info(f"ADF Validation took: {calculate_time(t1)} ms")
 
     if not validation_check:
         item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, 'REJECTED', validation_code)
@@ -103,6 +113,7 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
                                                                 lat=lat,
                                                                 lon=lon)
         obj['adf']['prospect']['vendor'] = nearest_vendor
+        logger.info(f"Finding nearest dealer took: {calculate_time(t1)} ms")
 
     # check if the lead is duplicated
     if db_helper_session.check_duplicate_lead(email, phone, last_name, make,
@@ -120,10 +131,12 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
     # convert the enriched lead to ML input format
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
     logger.info(ml_input)
+    logger.info(f"Enriching lead took: {calculate_time(t1)} ms")
 
     # score the lead
     result = score_ml_input(ml_input, make, dealer_available)
     logger.info(f"ml score: {result}")
+    logger.info(f"Scoring lead took: {calculate_time(t1)} ms")
 
     # create the response
     response_body = {}
@@ -134,14 +147,6 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         response_body["status"] = "REJECTED"
         response_body["code"] = "16_LOW_SCORE"
 
-    # create and dump data for quicksight analysis
-    item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
-                                        response_body['code'])
-    s3_helper_client.put_file(item=item, path=path)
-
-    # store the lead response in ddb
-    db_helper_session.insert_lead(lead_hash, obj['adf']['prospect']['provider']['service'], response_body['status'])
-
     # verify the customer
     if response_body['status'] == 'ACCEPTED':
         contact_verified = await verify_phone_and_email(email, phone)
@@ -149,32 +154,39 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
 
-    # insert the lead into ddb with oem details
-    if response_body['status'] == 'ACCEPTED':
-        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name+make+model))
-        db_helper_session.insert_oem_lead(uuid=lead_uuid,
-                                          make=make,
-                                          model=model,
-                                          date=datetime.today().strftime('%Y-%m-%d'),
-                                          email=email,
-                                          phone=phone,
-                                          last_name=last_name,
-                                          timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
-                                          make_model_filter_status=db_helper_session.get_make_model_filter_status(make),
-                                          lead_hash=lead_hash,
-                                          dealer=obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
-                                          provider=obj['adf']['prospect']['provider']['service'],
-                                          postalcode=obj['adf']['prospect']['customer']['contact']['address']['postalcode']
-                                          )
-        db_helper_session.insert_customer_lead(uuid=lead_uuid,
-                                               email=email,
-                                               phone=phone,
-                                               last_name=last_name,
-                                               make=make,
-                                               model=model)
-    time_taken = (time.process_time() - start) * 1000
+    logger.info(f"Validating customer took: {calculate_time(t1)} ms")
+    item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
+                                        response_body['code'])
 
-    response_body["message"] = f" {result} Response Time : {time_taken} ms"
+    # insert the lead into ddb with oem & customer details
+    # put the lead in s3
+    if response_body['status'] == 'ACCEPTED':
+        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
+        make_model_filter = db_helper_session.get_make_model_filter_status(make)
+        logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(s3_helper_client.put_file, item, path),
+                       executor.submit(db_helper_session.insert_lead, lead_hash,
+                                       obj['adf']['prospect']['provider']['service'], response_body['status']),
+                       executor.submit(db_helper_session.insert_oem_lead, lead_uuid, make, model,
+                                       datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
+                                       datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
+                                       obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                                       obj['adf']['prospect']['provider']['service'],
+                                       obj['adf']['prospect']['customer']['contact']['address']['postalcode']),
+                       executor.submit(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
+                                       last_name, make, model)]
+        logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+    else:
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(s3_helper_client.put_file, item, path),
+                       executor.submit(db_helper_session.insert_lead, lead_hash,
+                                       obj['adf']['prospect']['provider']['service'], response_body['status'])]
+            logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+    time_taken = (int(time.time()*1000.0) - start)
+
+    response_body["message"] = f"{result} Response Time : {time_taken} ms"
     logger.info(
         f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
     return response_body
