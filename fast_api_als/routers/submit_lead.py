@@ -30,6 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def calculate_time(t1):
     elapsed_time = int(time.time()*1000.0) - t1[0]
     t1[0] = int(time.time()*1000.0)
@@ -104,11 +105,13 @@ async def submit(file: Request, apikey: APIKey = Depends(get_api_key)):
         for future in as_completed(futures):
             result = future.result()
             if result.get('Duplicate_Api_Call', {}).get('status', False):
+                logger.info(f"Duplicate API Call")
                 return {
                     "status": f"Already {result['Duplicate_Api_Call']['response']}",
                     "message": "Duplicate Api Call"
                 }
             if result.get('Duplicate_Lead', False):
+                logger.info(f"Duplicate Lead")
                 return {
                     "status": "REJECTED",
                     "code": "12_DUPLICATE",
