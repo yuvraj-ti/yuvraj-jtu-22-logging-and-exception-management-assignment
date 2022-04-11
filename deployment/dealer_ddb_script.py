@@ -1,13 +1,17 @@
+import os
 import boto3
 import dynamodbgeo
 import uuid
 import csv, json
 
+access_key_id = os.getenv("als_access_key_id")
+secret_access_key = os.getenv("als_secret_access_key")
+
 ddb = boto3.client('dynamodb',
-                   aws_access_key_id='YOUR_ACCESS_KEY_ID',
-                   aws_secret_access_key='YOUR_SECERET_ACCESS_KEY',
-                   region_name='us-east-1'
-                   )
+    aws_access_key_id=access_key_id,
+    aws_secret_access_key=secret_access_key,
+    region_name='us-east-1'
+)
 
 config = dynamodbgeo.GeoDataManagerConfiguration(ddb, 'als-dealer-table-test')
 
