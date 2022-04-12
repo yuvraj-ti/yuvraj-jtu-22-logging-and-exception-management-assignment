@@ -73,7 +73,7 @@ async def register_3pl(cred: Request, token: str = Depends(get_token)):
 async def get_quicksight_url(request: Request, token: str = Depends(get_token)):
     # body = await request.body()
     # body = json.loads(body)
-    service_name, user_role = get_user_role(token)
+    service_name, user_role = get_user_role(token, cognito_client)
 
     dashboard_arn = constants.DASHBOARD_ARN.get(user_role)
     dashboard_id = constants.ADMIN_DASHBOARD_ID

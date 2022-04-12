@@ -2,6 +2,7 @@ import uuid
 import logging
 import time
 import boto3
+import botocore
 from boto3.dynamodb.conditions import Key
 import dynamodbgeo
 
@@ -18,14 +19,14 @@ logger = logging.getLogger(__name__)
 class DBHelper:
     def __init__(self, session: boto3.session.Session):
         self.session = session
-        self.ddb_resource = session.resource('dynamodb')
+        self.ddb_resource = session.resource('dynamodb', config=botocore.client.Config(max_pool_connections=99))
         self.table = self.ddb_resource.Table(constants.DB_TABLE_NAME)
         self.geo_data_manager = self.get_geo_data_manager()
         self.dealer_table = self.ddb_resource.Table(constants.DEALER_DB_TABLE)
         self.get_api_key_author("Initialize_Connection")
 
     def get_geo_data_manager(self):
-        config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb'), constants.DEALER_DB_TABLE)
+        config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb', config=botocore.client.Config(max_pool_connections=99)), constants.DEALER_DB_TABLE)
         geo_data_manager = dynamodbgeo.GeoDataManager(config)
         return geo_data_manager
 

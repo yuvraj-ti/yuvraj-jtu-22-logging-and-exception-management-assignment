@@ -1,6 +1,7 @@
 import logging
 import json
 import time
+import botocore
 
 from fast_api_als import constants
 from fast_api_als.utils.boto3_utils import get_boto3_session
@@ -38,5 +39,5 @@ def verify_response(response, data):
 
 
 session = get_boto3_session()
-client = session.client('s3')
+client = session.client('s3', config=botocore.client.Config(max_pool_connections=99))
 s3_helper_client = S3Helper(client)
