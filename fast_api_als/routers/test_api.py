@@ -5,17 +5,14 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks
 import logging
 from datetime import datetime
-import concurrent.futures
-from multiprocessing.dummy import Pool
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-# pool = Pool(10)
 
 from starlette.status import HTTP_403_FORBIDDEN
 
 from fast_api_als.constants import (
     HYU_DEALER_ENDPOINT_NAME, SUPPORTED_OEMS,
 )
+from fast_api_als.utils.sqs_utils import sqs_helper_session
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.quicksight.s3_helper import s3_helper_client
 from fast_api_als.services.alternate_verify_phone_and_email import alternate_verify_phone_and_email
@@ -24,6 +21,7 @@ from fast_api_als.services.enrich.demographic_data import get_customer_coordinat
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
 from fast_api_als.services.ml_helper import conversion_to_ml_input, score_ml_input, check_threshold
 from fast_api_als.services.predict_score import ml_predict_score
+from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.ml_init_data.HYU.ml_init_data import dummy_data
 from fast_api_als.services.authenticate import get_api_key
@@ -43,8 +41,8 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_time(t1):
-    elapsed_time = int(time.time()*1000.0) - t1[0]
-    t1[0] = int(time.time()*1000.0)
+    elapsed_time = int(time.time() * 1000.0) - t1[0]
+    t1[0] = int(time.time() * 1000.0)
     return elapsed_time
 
 
@@ -98,12 +96,12 @@ def predict():
 # submit lead without inserting into DDB
 @router.post("/submit-test/")
 async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
-    start = time.process_time()
-    if not db_helper_session.verify_api_key(apikey):
-        logger.info(f"Wrong Api Key Received")
-        raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN, detail="Wrong API Key"
-        )
+    start = int(time.time() * 1000.0)
+    # if not db_helper_session.verify_api_key(apikey):
+    #     logger.info(f"Wrong Api Key Received")
+    #     raise HTTPException(
+    #         status_code=HTTP_403_FORBIDDEN, detail="Wrong API Key"
+    #     )
     body = await file.body()
     body = str(body, 'utf-8')
 
@@ -152,26 +150,27 @@ async def submit_test(file: Request, apikey: APIKey = Depends(get_api_key)):
     email, phone, last_name = get_contact_details(obj)
 
     if response_body['status'] == 'ACCEPTED':
-        # contact_verified = await verify_phone_and_email(email, phone)
+        contact_verified = await verify_phone_and_email(email, phone)
         start_time = time.time()
-        contact_verified = await alternate_verify_phone_and_email(email['#text'], phone)
+        # contact_verified = await alternate_verify_phone_and_email(email['#text'], phone)
         process_time = time.time() - start_time
         logger.info(f"Time Taken for validation {process_time * 1000}")
         if not contact_verified:
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
 
-    time_taken = (time.process_time() - start) * 1000
+    time_taken = (int(time.time() * 1000.0) - start)
     response_body["message"] = f" {result} Response Time : {time_taken} ms"
     logger.info(
         f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
     return response_body
 
+
 # api for load testing ( do not use 3rd party service and do not check for duplicate api calls )
 @router.post("/submit_load/")
-async def submit1(file: Request, background_tasks: BackgroundTasks, apikey: APIKey = Depends(get_api_key)):
-    start = int(time.time()*1000.0)
-    t1 = [int(time.time()*1000.0)]
+async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
+    start = int(time.time() * 1000.0)
+    t1 = [int(time.time() * 1000.0)]
     if not db_helper_session.verify_api_key(apikey):
         logger.info(f"Wrong Api Key Received")
         raise HTTPException(
@@ -280,12 +279,11 @@ async def submit1(file: Request, background_tasks: BackgroundTasks, apikey: APIK
         response_body["code"] = "16_LOW_SCORE"
 
     # verify the customer
-    if response_body['status'] == 'ACCEPTED':
-        # contact_verified = await verify_phone_and_email(email, phone)
-        # if not contact_verified:
-        #     response_body['status'] = 'REJECTED'
-        #     response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
-        time.sleep(.500)
+    # if response_body['status'] == 'ACCEPTED':
+    #     contact_verified = await verify_phone_and_email(email, phone)
+    #     if not contact_verified:
+    #         response_body['status'] = 'REJECTED'
+    #         response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
 
     # Inserting all data parallely
     # create and dump data for quicksight analysis
@@ -294,26 +292,62 @@ async def submit1(file: Request, background_tasks: BackgroundTasks, apikey: APIK
                                         response_body['code'])
 
     # insert the lead into ddb with oem details
+    # delegate inserts to sqs queue
     if response_body['status'] == 'ACCEPTED':
         lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
         make_model_filter = db_helper_session.get_make_model_filter_status(make)
         logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
-        background_tasks.add_task(s3_helper_client.put_file, item, path)
-        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
-                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
-        background_tasks.add_task(db_helper_session.insert_oem_lead, lead_uuid, make, model,
-                                  datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
-                                  datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
-                                  obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
-                                  obj['adf']['prospect']['provider']['service'],
-                                  obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
-        background_tasks.add_task(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
-                                  last_name, make, model)
-        logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+        message = {
+            'put_file': {
+                'item': item,
+                'path': path
+            },
+            'insert_lead': {
+                'lead_hash': lead_hash,
+                'service': obj['adf']['prospect']['provider']['service'],
+                'response': response_body['status']
+            },
+            'insert_oem_lead': {
+                'lead_uuid': lead_uuid,
+                'make': make,
+                'model': model,
+                'date': datetime.today().strftime('%Y-%m-%d'),
+                'email': email,
+                'phone': phone,
+                'last_name': last_name,
+                'timestamp': datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
+                'make_model_filter': make_model_filter,
+                'lead_hash': lead_hash,
+                'vendor': obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                'service': obj['adf']['prospect']['provider']['service'],
+                'postalcode': obj['adf']['prospect']['customer']['contact']['address']['postalcode']
+            },
+            'insert_customer_lead': {
+                'lead_uuid': lead_uuid,
+                'email': email,
+                'phone': phone,
+                'last_name': last_name,
+                'make': make,
+                'model': model
+            }
+        }
+        logger.info(f"Message to be sent to queue: {message}")
+        res = sqs_helper_session.send_message(message)
+        logger.info(f"Sending message to sqs queue took: {calculate_time(t1)} ms")
+
     else:
-        background_tasks.add_task(s3_helper_client.put_file, item, path)
-        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
-                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
+        message = {
+            'put_file': {
+                'item': item,
+                'path': path
+            },
+            'insert_lead': {
+                'lead_hash': lead_hash,
+                'service': obj['adf']['prospect']['provider']['service'],
+                'response': response_body['status']
+            }
+        }
+        res = sqs_helper_session.send_message(message)
         logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
     time_taken = (int(time.time() * 1000.0) - start)
 
