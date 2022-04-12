@@ -21,6 +21,7 @@ from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.ml_helper import conversion_to_ml_input, score_ml_input, check_threshold
 from fast_api_als.utils.quicksight_utils import create_quicksight_data
 from fast_api_als.quicksight.s3_helper import s3_helper_client
+from fast_api_als.utils.sqs_utils import sqs_helper_session
 
 router = APIRouter()
 logging.basicConfig(
@@ -165,27 +166,62 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
                                         response_body['code'])
 
     # insert the lead into ddb with oem & customer details
-    # put the lead in s3
+    # delegate inserts to sqs queue
     if response_body['status'] == 'ACCEPTED':
         lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
         make_model_filter = db_helper_session.get_make_model_filter_status(make)
         logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
-        background_tasks.add_task(s3_helper_client.put_file, item, path)
-        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
-                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
-        background_tasks.add_task(db_helper_session.insert_oem_lead, lead_uuid, make, model,
-                                  datetime.today().strftime('%Y-%m-%d'), email, phone, last_name,
-                                  datetime.today().strftime('%Y-%m-%d-%H:%M:%S'), make_model_filter, lead_hash,
-                                  obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
-                                  obj['adf']['prospect']['provider']['service'],
-                                  obj['adf']['prospect']['customer']['contact']['address']['postalcode'])
-        background_tasks.add_task(db_helper_session.insert_customer_lead, lead_uuid, email, phone,
-                                  last_name, make, model)
-        logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
+        message = {
+            'put_file': {
+                'item': item,
+                'path': path
+            },
+            'insert_lead': {
+                'lead_hash': lead_hash,
+                'service': obj['adf']['prospect']['provider']['service'],
+                'response': response_body['status']
+            },
+            'insert_oem_lead': {
+                'lead_uuid': lead_uuid,
+                'make': make,
+                'model': model,
+                'date': datetime.today().strftime('%Y-%m-%d'),
+                'email': email,
+                'phone': phone,
+                'last_name': last_name,
+                'timestamp': datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
+                'make_model_filter': make_model_filter,
+                'lead_hash': lead_hash,
+                'vendor': obj['adf']['prospect']['vendor'].get('vendorname', 'unknown'),
+                'service': obj['adf']['prospect']['provider']['service'],
+                'postalcode': obj['adf']['prospect']['customer']['contact']['address']['postalcode']
+            },
+            'insert_customer_lead': {
+                'lead_uuid': lead_uuid,
+                'email': email,
+                'phone': phone,
+                'last_name': last_name,
+                'make': make,
+                'model': model
+            }
+        }
+        logger.info(f"Message to be sent to queue: {message}")
+        res = sqs_helper_session.send_message(message)
+        logger.info(f"Sending message to sqs queue took: {calculate_time(t1)} ms")
+
     else:
-        background_tasks.add_task(s3_helper_client.put_file, item, path)
-        background_tasks.add_task(db_helper_session.insert_lead, lead_hash,
-                                  obj['adf']['prospect']['provider']['service'], response_body['status'])
+        message = {
+            'put_file': {
+                'item': item,
+                'path': path
+            },
+            'insert_lead': {
+                'lead_hash': lead_hash,
+                'service': obj['adf']['prospect']['provider']['service'],
+                'response': response_body['status']
+            }
+        }
+        res = sqs_helper_session.send_message(message)
         logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
     time_taken = (int(time.time() * 1000.0) - start)
 
