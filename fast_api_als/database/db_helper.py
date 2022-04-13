@@ -179,14 +179,19 @@ class DBHelper:
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, oem + make_model)
 
-    def fetch_oem_data(self, oem):
+    def fetch_oem_data(self, oem, parallel=False):
         res = self.table.get_item(
             Key={
                 'pk': f"OEM#{oem}",
                 'sk': "METADATA"
             }
         )
-        return res['Item']
+        if parallel:
+            return {
+                "fetch_oem_data": res['Item']
+            }
+        else:
+            return res['Item']
 
     def create_new_oem(self, oem: str, make_model: str, threshold: str):
         res = self.table.put_item(
