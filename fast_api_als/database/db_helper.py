@@ -186,6 +186,8 @@ class DBHelper:
                 'sk': "METADATA"
             }
         )
+        if 'Item' not in res:
+            return {}
         if parallel:
             return {
                 "fetch_oem_data": res['Item']
@@ -228,9 +230,16 @@ class DBHelper:
 
     def set_oem_threshold(self, oem: str, threshold: str):
         item = self.fetch_oem_data(oem)
+        if item == {}:
+            return {
+                "error": f"OEM {oem} not found"
+            }
         item['threshold'] = threshold
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, oem + threshold)
+        return {
+            "success": f"OEM {oem} threshold set to {threshold}"
+        }
 
     def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
         query_input = {
