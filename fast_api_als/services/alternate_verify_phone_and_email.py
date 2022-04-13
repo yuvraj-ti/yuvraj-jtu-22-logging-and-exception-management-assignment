@@ -11,27 +11,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def verify_email(email: str, data: dict) -> None:
+async def alternate_verify_email(email: str, data: dict) -> None:
+    logger.info(f"Alternate Email :{email} Validation started at: {time.process_time()} ")
     if email == '':
         return
-    is_valid = validate_email(
-        email_address=email,
-        check_format=True,
-        check_blacklist=True,
-        check_dns=False,
-        dns_timeout=1,
-        check_smtp=False,
-        smtp_timeout=10,
-        smtp_debug=True
-    )
-    data["email"] = is_valid
+    try:
+        email_valid = validate_email(
+            email_address=email,
+            check_format=True,
+            check_blacklist=True,
+            check_dns=False,
+            dns_timeout=1,
+            check_smtp=False,
+            smtp_timeout=1,
+            smtp_debug=True
+        )
+        data["alternate_email"] = email_valid
+        logger.info(f"Alternate Email :{email} Validation finished at: {time.process_time()} ")
+    except Exception as e:
+        logger.info(f"Exception: {e}")
 
 
-async def verify_phone(phone: str, data: dict) -> None:
+async def alternate_verify_phone(phone: str, data: dict) -> None:
+    logger.info(f"Alternate Phone :{phone} Validation started at: {time.process_time()} ")
     if phone == '':
         return
-    x = phonenumbers.parse(phone, "US")
-    data["phone"] = phonenumbers.is_valid_number(x)
+    try:
+        phone_number = phonenumbers.parse(phone, "US")
+        is_valid = phonenumbers.is_valid_number(phone_number)
+        data["alternate_phone"] = is_valid
+        logger.info(f"Alternate Phone :{phone} Validation finished at: {time.process_time()} ")
+    except phonenumbers.phonenumberutil.NumberParseException as e:
+        logger.info(f"Exception: {e}")
 
 
 async def alternate_verify_phone_and_email(email: str, phone_number: str) -> bool:
@@ -41,13 +52,13 @@ async def alternate_verify_phone_and_email(email: str, phone_number: str) -> boo
     email_valid = False
     phone_valid = False
     await asyncio.gather(
-        verify_phone(phone_number, data),
-        verify_email(email, data),
+        alternate_verify_phone(phone_number, data),
+        alternate_verify_email(email, data),
     )
-    if "email" in data:
-        email_valid = data["email"]
-    if "phone" in data:
-        phone_valid = data["phone"]
+    if "alternate_email" in data:
+        email_valid = data["alternate_email"]
+    if "alternate_phone" in data:
+        phone_valid = data["alternate_phone"]
     logger.info(
         f"isPhoneVerified :{phone_valid} and idEmailValid: {email_valid} finished at: {(time.process_time() - start) * 1000} ms ")
     return email_valid | phone_valid

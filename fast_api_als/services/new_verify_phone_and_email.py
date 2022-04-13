@@ -5,6 +5,7 @@ import logging
 from fast_api_als.constants import (
  NUM_VERIFY_ACCESS_KEY, NUM_VERIFY_URL, TOWER_DATA_URL, TOWER_DATA_API_KEY
 )
+from fast_api_als.services.alternate_verify_phone_and_email import alternate_verify_phone, alternate_verify_email
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,9 +51,11 @@ async def new_verify_phone_and_email(email: str, phone_number: str) -> bool:
     await asyncio.gather(
         call_validation_service(email_validation_url, "email", email, data),
         call_validation_service(phone_validation_url, "phone", phone_number, data),
+        alternate_verify_phone(phone_number, data),
+        alternate_verify_email(email, data)
     )
     if "email" in data:
-        if data["email"].get("email_validation",{}).get("status","unknown") not in ("invalid", "risky"):
+        if data["email"].get("email_validation",{}).get("status", "unknown") not in ("invalid", "risky"):
             email_valid = True
     if "phone" in data:
         if data["phone"].get("valid", False):
