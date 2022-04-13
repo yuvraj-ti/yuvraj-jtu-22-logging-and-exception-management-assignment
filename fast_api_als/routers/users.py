@@ -136,7 +136,7 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
                 detail=f"Not Authorized")
-        if role == "OEM":
+        if role == "3PL":
             db_helper_session.register_3PL(name)
         return "SUCCESS"
     except Exception as e:

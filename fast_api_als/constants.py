@@ -20,8 +20,11 @@ BMW_DEALER_ENDPOINT_NAME = os.getenv('BMW_DEALER_ENDPOINT_NAME')
 # MASERATI Endpoint Constants
 MAS_DEALER_ENDPOINT_NAME = os.getenv('MAS_DEALER_ENDPOINT_NAME')
 
+# General Model Constants
+GEN_DEALER_ENDPOINT_NAME = os.getenv('GEN_DEALER_ENDPOINT_NAME')
+
 # Admin Constants
-SUPPORTED_OEMS = ["hyundai", "bmw"]
+SUPPORTED_OEMS = ["hyundai", "bmw", "maserati"]
 
 # Data Tool 3rd Party Service Constants
 ALS_DATA_TOOL_REQUEST_KEY = os.getenv('ALS_DATA_TOOL_REQUEST_KEY')

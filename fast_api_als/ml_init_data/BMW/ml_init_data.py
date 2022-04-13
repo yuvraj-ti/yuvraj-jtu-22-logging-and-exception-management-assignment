@@ -104,6 +104,6 @@ initial_ml_input_bmw_dealer = {
     "OCR_cat_good": 0,
     "OCR_cat_normal": 0,
     "OCR_cat_worst": 0,
-    "EmailDomainCat_Ratio": 0.04438530340664647,
-    "lead_ProviderService_Ratio": 0.044290802250891076,
+    "EmailDomainCat_Ratio": 0,
+    "lead_ProviderService_Ratio": 0,
 }

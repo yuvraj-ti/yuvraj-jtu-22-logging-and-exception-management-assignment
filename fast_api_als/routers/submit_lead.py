@@ -10,6 +10,7 @@ from fastapi.security.api_key import APIKey
 from starlette.status import HTTP_403_FORBIDDEN
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from fast_api_als.constants import SUPPORTED_OEMS
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich.demographic_data import get_customer_coordinate
@@ -94,6 +95,12 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
     email, phone, last_name = get_contact_details(obj)
     make = obj['adf']['prospect']['vehicle']['make']
     model = obj['adf']['prospect']['vehicle']['model']
+    if make.lower() not in SUPPORTED_OEMS:
+        return {
+            "status": "REJECTED",
+            "code": "19_OEM_NOT_SUPPORTED",
+            "message": f"Do not support OEM: {make}"
+        }
 
     logger.info(f"{dealer_available}::{email}:{phone}:{last_name}::{make}")
 

@@ -101,7 +101,7 @@ def get_enriched_lead_json(adf_json: dict) -> dict:
         'Period': str(request_datetime.year) + '-' + str(request_datetime.month),
         "Model": adf_json['adf']['prospect']['vehicle']['model'],
         "Lead_Source": "hyundaiusa",
-        "Rating": dealer_data.get('rating',constants.DEALER_RATING),
+        "Rating": dealer_data.get('rating', constants.DEALER_RATING),
         "LifeTimeReviews":  dealer_data.get('reviews', constants.LIFETIMEREVIEWS),
         "Recommended": dealer_data.get('recommended', constants.RECOMMENDED),
         "SCR": constants.DEALER_SCR,
