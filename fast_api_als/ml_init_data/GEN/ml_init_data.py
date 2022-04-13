@@ -4,7 +4,6 @@ column_list_gen_dealer = [
     'FirstLastPropCase',
     'NameEmailCheck',
     'SingleHour',
-    'EmailDomainCat',
     'ColoursNotChosen',
     'Income',
     'ZipPopulationDensity',
