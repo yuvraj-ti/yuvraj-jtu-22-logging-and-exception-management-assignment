@@ -337,9 +337,20 @@ async def delete_user(request: Request, token: str = Depends(get_token)):
         }
     logger.info(f"Delete user request: {body['username']}")
     username = body['username']
-    res = congito_delete_user(username, cognito_client)
-    logger.info(f"Delete user response: {res}")
+    res, role = congito_delete_user(username, cognito_client)
+    if res == "SUCCESS":
+        if role == "3PL":
+            db_helper_session.delete_3PL(username)
+        elif role == "OEM":
+            db_helper_session.delete_oem(username)
+        logger.info(f"Delete user response: {res}")
+        return {
+            "status_code": HTTP_200_OK,
+            "message": "User deleted successfully"
+        }
+
     return {
-        "status_code": HTTP_200_OK,
+        "status_code": HTTP_400_BAD_REQUEST,
         "message": res
     }
+
