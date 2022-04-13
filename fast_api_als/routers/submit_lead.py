@@ -104,11 +104,13 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
 
     logger.info(f"{dealer_available}::{email}:{phone}:{last_name}::{make}")
 
+    fetched_oem_data = {}
     # check if 3PL is making a duplicate call or it is a duplicate lead
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(db_helper_session.check_duplicate_api_call, lead_hash,
                                    obj['adf']['prospect']['provider']['service']),
-                   executor.submit(db_helper_session.check_duplicate_lead, email, phone, last_name, make, model)
+                   executor.submit(db_helper_session.check_duplicate_lead, email, phone, last_name, make, model),
+                   executor.submit(db_helper_session.fetch_oem_data, make, True)
                    ]
         for future in as_completed(futures):
             result = future.result()
@@ -125,6 +127,8 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
                     "code": "12_DUPLICATE",
                     "message": "This is a duplicate lead"
                 }
+            if "fetch_oem_data" in result:
+                fetched_oem_data = result['fetch_oem_data']
     logger.info(f"Duplicate check took: {calculate_time(t1)} ms")
 
     # if dealer is not available then find nearest dealer
