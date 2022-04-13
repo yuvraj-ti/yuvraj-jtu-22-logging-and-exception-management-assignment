@@ -107,7 +107,7 @@ def fetch_all_users_by_role(role, cognito_client):
     return users
 
 
-def delete_user(username, cognito_client):
+def congito_delete_user(username, cognito_client):
     """
         Deletes a user.
     Args:

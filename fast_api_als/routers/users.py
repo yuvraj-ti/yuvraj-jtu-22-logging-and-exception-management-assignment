@@ -5,7 +5,8 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.authenticate import get_token
-from fast_api_als.utils.cognito_client import get_user_role, register_new_user, fetch_all_users, fetch_all_users_by_role
+from fast_api_als.utils.cognito_client import get_user_role, register_new_user, fetch_all_users, \
+    fetch_all_users_by_role, congito_delete_user
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
 from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
@@ -336,7 +337,7 @@ async def delete_user(request: Request, token: str = Depends(get_token)):
         }
     logger.info(f"Delete user request: {body['username']}")
     username = body['username']
-    res = delete_user(username, cognito_client)
+    res = congito_delete_user(username, cognito_client)
     logger.info(f"Delete user response: {res}")
     return {
         "status_code": HTTP_200_OK,
