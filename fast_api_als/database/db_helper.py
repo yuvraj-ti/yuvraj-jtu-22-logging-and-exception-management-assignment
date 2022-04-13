@@ -148,10 +148,11 @@ class DBHelper:
         )
         item = res['Items']
         if len(item) == 0:
-            return "3PL doesn't exist"
+            return None
         return item[0]['sk']
 
     def set_auth_key(self, username: str):
+        self.delete_oem(username)
         apikey = str(uuid.uuid4())
         res = self.table.put_item(
             Item={
@@ -186,6 +187,39 @@ class DBHelper:
             }
         )
         return res['Item']
+
+    def create_new_oem(self, oem: str, make_model: str, threshold: str):
+        res = self.table.put_item(
+            Item={
+                'pk': f"OEM#{oem}",
+                'sk': "METADATA",
+                'settings': {
+                    'make_model': make_model
+                },
+                'threshold': threshold
+            }
+        )
+        verify_add_entry_response(res, oem)
+
+    def delete_oem(self, oem: str):
+        res = self.table.delete_item(
+            Key={
+                'pk': f"OEM#{oem}",
+                'sk': "METADATA"
+            }
+        )
+        verify_add_entry_response(res, oem+"#Delete")
+
+    def delete_3PL(self, username: str):
+        authkey = self.get_auth_key(username)
+        if authkey:
+            res = self.table.delete_item(
+                Key={
+                    'pk': username,
+                    'sk': authkey
+                }
+            )
+            verify_add_entry_response(res, username)
 
     def set_oem_threshold(self, oem: str, threshold: str):
         item = self.fetch_oem_data(oem)
