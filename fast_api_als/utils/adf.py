@@ -95,9 +95,6 @@ def validate_adf_values(input_json):
         logger.info("Datetime is not in ISO8601 format")
         return {"status": "REJECTED", "code": "3_INVALID_FIELD", "message": "Invalid DateTime"}
 
-    # check if we support this OEM
-    if make.lower() not in SUPPORTED_OEMS:
-        return {"status": "REJECTED", "code": "19_OEM_NOT_SUPPORTED", "message": f"Do not support OEM: {make}"}
     return {"status": "OK"}
 
 
