@@ -14,7 +14,7 @@ from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich.demographic_data import get_customer_coordinate
 from fast_api_als.services.enrich_lead import get_enriched_lead_json
-from fast_api_als.services.verify_phone_and_email import verify_phone_and_email
+from fast_api_als.services.new_verify_phone_and_email import new_verify_phone_and_email
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.calculate_lead_hash import calculate_lead_hash
 from fast_api_als.database.db_helper import db_helper_session
@@ -156,7 +156,7 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
 
     # verify the customer
     if response_body['status'] == 'ACCEPTED':
-        contact_verified = await verify_phone_and_email(email, phone)
+        contact_verified = await new_verify_phone_and_email(email, phone)
         if not contact_verified:
             response_body['status'] = 'REJECTED'
             response_body['code'] = '17_FAILED_CONTACT_VALIDATION'
