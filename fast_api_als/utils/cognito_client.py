@@ -1,10 +1,7 @@
-from fast_api_als.constants import ALS_USER_POOL_ID
-
 from fastapi import HTTPException
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
-from fast_api_als.constants import ALS_AWS_ACCESS_KEY, ALS_AWS_REGION, ALS_AWS_SECRET_KEY, ALS_USER_POOL_ID
-from fast_api_als.routers.users import cognito_client
+from fast_api_als.constants import ALS_USER_POOL_ID
 
 
 def get_user_role(token: str, cognito_client):
