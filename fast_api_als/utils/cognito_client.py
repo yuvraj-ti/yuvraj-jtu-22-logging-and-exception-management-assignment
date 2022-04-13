@@ -61,3 +61,44 @@ def register_new_user(email: str, name: str, role: str, cognito_client):
         return "SUCCESS"
     else:
         return "REJECT"
+
+
+def fetch_all_users(cognito_client):
+    """
+        Fetches all the users.
+    Args:
+        cognito_client: The cognito client to use.
+
+    Returns:
+        The users.
+    """
+    res = cognito_client.list_users(
+        UserPoolId=ALS_USER_POOL_ID
+    )
+    users = []
+    for user in res['Users']:
+        user_attribute = {}
+        for attr in user['Attributes']:
+            user_attribute[attr['Name']] = attr['Value']
+        users.append(user_attribute)
+    return users
+
+
+def delete_user(username, cognito_client):
+    """
+        Deletes a user.
+    Args:
+        username: The username of the user.
+        cognito_client: The cognito client to use.
+
+    Returns:
+        The success or reject response.
+    """
+    res = cognito_client.admin_delete_user(
+        UserPoolId=ALS_USER_POOL_ID,
+        Username=username
+    )
+    if res['ResponseMetadata']['HTTPStatusCode'] == 200:
+        return "SUCCESS"
+    else:
+        return "REJECT"

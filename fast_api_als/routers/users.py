@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.authenticate import get_token
-from fast_api_als.utils.cognito_client import get_user_role, register_new_user
+from fast_api_als.utils.cognito_client import get_user_role, register_new_user, fetch_all_users
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
 from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
@@ -229,7 +229,7 @@ async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
             "status": HTTP_400_BAD_REQUEST,
             "message": "Missing oem"
         }
-
+    logger.info(f"Oem threshold view by: {body['oem']}")
     oem = body['oem']
     name, role = get_user_role(token, cognito_client)
     if role != "ADMIN" and (role != "OEM"):
@@ -248,6 +248,7 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
     provider, role = get_user_role(token, cognito_client)
+    logger.info(f"Reset authkey by: {provider}, {role}")
     logger.info(f"Api key reset requested by {provider}: {role}")
     if role != "ADMIN" and (role != "3PL"):
         raise HTTPException(
@@ -266,6 +267,7 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
 async def view_authkey(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
+    logger.info(f"Api key view requested by {body['3pl']}: {body['role']}")
     provider, role = get_user_role(token, cognito_client)
     if role != "ADMIN" and role != "3PL":
         raise HTTPException(
@@ -277,4 +279,43 @@ async def view_authkey(request: Request, token: str = Depends(get_token)):
     return {
         "status_code": HTTP_200_OK,
         "x-api-key": apikey
+    }
+
+
+@router.post("/view_users")
+async def view_all_users(token: str = Depends(get_token)):
+    name, role = get_user_role(token, cognito_client)
+    logger.info(f"User list requested by {name}, {role}")
+    if role != "ADMIN":
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    users = fetch_all_users(cognito_client)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": users
+    }
+
+
+@router.post("/delete_users")
+async def delete_user(request: Request, token: str = Depends(get_token)):
+    body = await request.body()
+    body = json.loads(body)
+    logger.info(f"Delete user request: {body}")
+    name, role = get_user_role(token, cognito_client)
+    if role != "ADMIN":
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    if 'username' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing username"
+        }
+    username = body['username']
+    res = delete_user(username, cognito_client)
+    logger.info(f"Delete user response: {res}")
+    return {
+        "status_code": HTTP_200_OK,
+        "message": res
     }
