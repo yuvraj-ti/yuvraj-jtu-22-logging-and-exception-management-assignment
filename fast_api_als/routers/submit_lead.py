@@ -131,7 +131,14 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
             "code": "20_OEM_DATA_NOT_FOUND",
             "message": "OEM data not found"
         }
-    oem_threshold = fetched_oem_data['threshold']
+    if 'threshold' not in fetched_oem_data:
+        logger.info(f"Threshold not set for {make}")
+        return {
+            "status": "REJECTED",
+            "code": "20_OEM_DATA_NOT_FOUND",
+            "message": "OEM data not found"
+        }
+    oem_threshold = float(fetched_oem_data['threshold'])
 
     # if dealer is not available then find nearest dealer
     if not dealer_available:

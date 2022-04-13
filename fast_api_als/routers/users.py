@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 
+from fast_api_als.constants import DEFAULT_OEM_LIMIT
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.authenticate import get_token
 from fast_api_als.utils.cognito_client import get_user_role, register_new_user, fetch_all_users, \
@@ -139,6 +140,8 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
                 detail=f"Not Authorized")
         if role == "3PL":
             db_helper_session.register_3PL(name)
+        if role == 'OEM':
+            db_helper_session.create_new_oem(name, "False", DEFAULT_OEM_LIMIT)
         return "SUCCESS"
     except Exception as e:
         logger.info(e)
@@ -213,10 +216,10 @@ async def set_oem_threshold(request: Request, token: str = Depends(get_token)):
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail=f"Not Authorized")
-    db_helper_session.set_oem_threshold(oem, threshold)
+    res = db_helper_session.set_oem_threshold(oem, threshold)
     return {
         "status_code": HTTP_200_OK,
-        "message": "settings updated"
+        "message": res
     }
 
 
@@ -238,6 +241,11 @@ async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
             status_code=HTTP_401_UNAUTHORIZED,
             detail=f"Not Authorized")
     oem_data = db_helper_session.fetch_oem_data(oem)
+    if oem_data == {}:
+        return {
+            "status_code": HTTP_200_OK,
+            "message": "No data found"
+        }
     return {
         "status_code": HTTP_200_OK,
         "message": oem_data['threshold']
