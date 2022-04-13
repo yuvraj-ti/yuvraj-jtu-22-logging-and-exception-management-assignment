@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.services.authenticate import get_token
-from fast_api_als.utils.cognito_client import get_user_role, register_new_user, fetch_all_users
+from fast_api_als.utils.cognito_client import get_user_role, register_new_user, fetch_all_users, fetch_all_users_by_role
 from fast_api_als.utils.quicksight_utils import generate_dashboard_url
 from fast_api_als import constants
 from starlette.status import HTTP_200_OK, HTTP_401_UNAUTHORIZED
@@ -297,11 +297,33 @@ async def view_all_users(token: str = Depends(get_token)):
     }
 
 
-@router.post("/delete_users")
+@router.post("/view_users_by_role")
+async def view_all_users_by_role(request: Request, token: str = Depends(get_token)):
+    body = await request.body()
+    body = json.loads(body)
+    if 'role' not in body:
+        return {
+            "status": HTTP_400_BAD_REQUEST,
+            "message": "Missing role"
+        }
+    user_role = body['role']
+    name, role = get_user_role(token, cognito_client)
+    logger.info(f"User list for {user_role} requested by {name}, {role}")
+    if role != "ADMIN":
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Not Authorized")
+    users = fetch_all_users_by_role(user_role, cognito_client)
+    return {
+        "status_code": HTTP_200_OK,
+        "message": users
+    }
+
+
+@router.post("/delete_user")
 async def delete_user(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
-    logger.info(f"Delete user request: {body}")
     name, role = get_user_role(token, cognito_client)
     if role != "ADMIN":
         raise HTTPException(
@@ -312,6 +334,7 @@ async def delete_user(request: Request, token: str = Depends(get_token)):
             "status": HTTP_400_BAD_REQUEST,
             "message": "Missing username"
         }
+    logger.info(f"Delete user request: {body['username']}")
     username = body['username']
     res = delete_user(username, cognito_client)
     logger.info(f"Delete user response: {res}")

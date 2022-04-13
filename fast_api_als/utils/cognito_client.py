@@ -84,6 +84,29 @@ def fetch_all_users(cognito_client):
     return users
 
 
+def fetch_all_users_by_role(role, cognito_client):
+    """
+        Fetches all the users by role.
+    Args:
+        role: The role of the user.
+        cognito_client: The cognito client to use.
+
+    Returns:
+        The users.
+    """
+    res = cognito_client.list_users(
+        UserPoolId=ALS_USER_POOL_ID,
+        Filter="custom:role = {}".format(role)
+    )
+    users = []
+    for user in res['Users']:
+        user_attribute = {}
+        for attr in user['Attributes']:
+            user_attribute[attr['Name']] = attr['Value']
+        users.append(user_attribute)
+    return users
+
+
 def delete_user(username, cognito_client):
     """
         Deletes a user.
