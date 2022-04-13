@@ -95,12 +95,6 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
     email, phone, last_name = get_contact_details(obj)
     make = obj['adf']['prospect']['vehicle']['make']
     model = obj['adf']['prospect']['vehicle']['model']
-    if make.lower() not in SUPPORTED_OEMS:
-        return {
-            "status": "REJECTED",
-            "code": "19_OEM_NOT_SUPPORTED",
-            "message": f"Do not support OEM: {make}"
-        }
 
     logger.info(f"{dealer_available}::{email}:{phone}:{last_name}::{make}")
 
@@ -130,6 +124,14 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
             if "fetch_oem_data" in result:
                 fetched_oem_data = result['fetch_oem_data']
     logger.info(f"Duplicate check took: {calculate_time(t1)} ms")
+    if fetched_oem_data == {}:
+        logger.info(f"OEM data not found")
+        return {
+            "status": "REJECTED",
+            "code": "20_OEM_DATA_NOT_FOUND",
+            "message": "OEM data not found"
+        }
+    oem_threshold = fetched_oem_data['threshold']
 
     # if dealer is not available then find nearest dealer
     if not dealer_available:
@@ -158,7 +160,7 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
 
     # create the response
     response_body = {}
-    if check_threshold(result, make, dealer_available):
+    if result >= oem_threshold:
         response_body["status"] = "ACCEPTED"
         response_body["code"] = "0_ACCEPTED"
     else:
