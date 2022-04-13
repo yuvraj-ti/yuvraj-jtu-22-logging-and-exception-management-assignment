@@ -5,6 +5,7 @@ import boto3
 import botocore
 from boto3.dynamodb.conditions import Key
 import dynamodbgeo
+from datetime import datetime, timedelta
 
 from fast_api_als import constants
 from fast_api_als.utils.boto3_utils import get_boto3_session
@@ -36,7 +37,8 @@ class DBHelper:
         item = {
             'pk': f'LEAD#{lead_hash}',
             'sk': lead_provider,
-            'response': response
+            'response': response,
+            'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.LEAD_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
@@ -64,7 +66,8 @@ class DBHelper:
             "lead_hash": lead_hash,
             "dealer": dealer,
             "3pl": provider,
-            "postalcode": postalcode
+            "postalcode": postalcode,
+            'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
 
         response = self.table.put_item(Item=item)
@@ -250,7 +253,8 @@ class DBHelper:
             'gsisk1': uuid,
             'oem': make,
             'make': make,
-            'model': model
+            'model': model,
+            'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{uuid}#{email}#{phone}")

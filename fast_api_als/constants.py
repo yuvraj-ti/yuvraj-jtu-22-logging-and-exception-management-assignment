@@ -60,3 +60,6 @@ POPULATION_DENSITY = 3585.81
 # SQS Queue
 SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME', 'auto-lead-scoring')
 
+# TTL
+LEAD_ITEM_TTL = 120
+OEM_ITEM_TTL = 30
