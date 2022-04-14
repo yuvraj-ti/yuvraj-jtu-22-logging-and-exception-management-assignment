@@ -81,4 +81,4 @@ OEM_ITEM_TTL = 30
 # Athena
 ATHENA_DATABASE_NAME = os.getenv('ATHENA_DATABASE_NAME', 'als')
 ATHENA_QUERY_BUCKET = os.getenv('ATHENA_QUERY_BUCKET', 'als-athena-query-result')
-
+ATHENA_TABLE_NAME = os.getenv('ATHENA_TABLE_NAME', 'auto_lead_scoring')

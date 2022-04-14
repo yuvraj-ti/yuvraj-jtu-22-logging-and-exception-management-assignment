@@ -1,6 +1,4 @@
 import logging
-import json
-import time
 import botocore
 
 from fast_api_als import constants
@@ -15,15 +13,15 @@ logger = logging.getLogger(__name__)
 
 class AthenaHelper:
     def __init__(self, athena_client):
-        self.ATHENA_BUCKET = constants.ATHENA_QUERY_BUCKET
+        self.ATHENA_BUCKET = 's3://' + constants.ATHENA_QUERY_BUCKET
         self.ATHENA_DATABASE = constants.ATHENA_DATABASE_NAME
         self.athena_client = athena_client
 
     def create_query(self, oem, epoch_timestamp):
-        query = f"""SELECT * FROM auto_lead_scoring_test as B
-                        WHERE epoch_timestamp >= {epoch_timestamp} and oem={oem} and status = 'ACCEPTED' and lead_hash in
+        query = f"""SELECT * FROM {constants.ATHENA_TABLE_NAME} as B
+                        WHERE epoch_timestamp >= {epoch_timestamp} and oem='{oem}' and status = 'ACCEPTED' and lead_hash in
                         (
-                            SELECT lead_hash FROM auto_lead_scoring_test as A
+                            SELECT lead_hash FROM {constants.ATHENA_TABLE_NAME} as A
                             where A.oem_responded = 1
                         )
                     """
