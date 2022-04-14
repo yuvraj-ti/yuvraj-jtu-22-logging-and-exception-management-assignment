@@ -1,0 +1,40 @@
+name: deploy-to-eyk
+
+on:
+  release:
+    types: [published]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout repository code
+        uses: actions/checkout@v2
+
+      - name: Add EYK remote
+        run: git remote add eyk ssh://git@eyk-builder.stage2.cnu-tu.ey.io:2222/auto-lead-scoring.git
+
+      - name: Save secrets key and host
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/eyk_rsa
+          chmod 600 ~/eyk_rsa
+          echo "$EYK_HOST" > ~/.ssh/known_hosts
+        env:
+          SSH_KEY: ${{secrets.EYK_STAGING_PRIVATE_KEY}}
+          EYK_HOST: ${{secrets.EYK_SSH_HOST}}
+
+      - name: Push to EYK
+        run: |
+          export GIT_SSH_COMMAND="ssh -i ~/eyk_rsa"
+          git push eyk --force
