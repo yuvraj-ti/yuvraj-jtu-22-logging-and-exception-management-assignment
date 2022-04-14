@@ -157,7 +157,7 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
 
     # convert the enriched lead to ML input format
     ml_input = conversion_to_ml_input(model_input, make, dealer_available)
-    logger.info(ml_input)
+    logger.info(ml_input, len(ml_input))
     logger.info(f"Converting to ML input took: {calculate_time(t1)} ms")
 
     # score the lead

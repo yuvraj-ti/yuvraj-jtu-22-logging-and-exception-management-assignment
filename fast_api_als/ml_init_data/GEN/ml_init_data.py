@@ -1,10 +1,8 @@
 column_list_gen_dealer = [
-    'LeadConverted',
     'DistanctToVendor',
     'FirstLastPropCase',
     'NameEmailCheck',
     'SingleHour',
-    'EmailDomainCat',
     'ColoursNotChosen',
     'Income',
     'ZipPopulationDensity',
