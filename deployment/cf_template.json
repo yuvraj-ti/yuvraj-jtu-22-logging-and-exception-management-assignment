@@ -1,0 +1,313 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "ALSTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "auto-lead-scoring-test",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "sk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "gsipk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "gsisk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "gsipk1",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "gsisk1",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "sk",
+            "KeyType": "RANGE"
+          }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "gsi-index",
+            "KeySchema": [
+              {
+                "AttributeName": "gsipk",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "gsisk",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            },
+            "ProvisionedThroughput": {
+              "ReadCapacityUnits": 10,
+              "WriteCapacityUnits": 10
+            }
+          },
+          {
+            "IndexName": "gsi1-index",
+            "KeySchema": [
+              {
+                "AttributeName": "gsipk1",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "gsisk1",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            },
+            "ProvisionedThroughput": {
+              "ReadCapacityUnits": 10,
+              "WriteCapacityUnits": 10
+            }
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 10,
+          "WriteCapacityUnits": 10
+        },
+        "Tags": [
+          {
+            "Key": "Owner",
+            "Value": "Created By Auto Lead Scoring Stack"
+          },
+          {
+            "Key": "Project",
+            "Value": "Auto Lead Scoring"
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "0b08b641-0b10-44d5-ae45-fe3d3789e431"
+        }
+      }
+    },
+    "QuicksightS3": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "auto-lead-scoring-quicksight-test",
+        "Tags": [
+          {
+            "Key": "Owner",
+            "Value": "Created By Auto Lead Scoring Stack"
+          },
+          {
+            "Key": "Project",
+            "Value": "Auto Lead Scoring"
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "45c1b3b0-3682-4431-98cd-248af459230c"
+        }
+      }
+    },
+    "LambdaScheduler": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "ZipFile": "import os\nimport json\nimport boto3\nfrom datetime import date, timedelta\nimport logging\nfrom boto3.dynamodb.conditions import Key\nimport requests\nlogger = logging.getLogger()\nlogger.setLevel('INFO')\nOEM_ENDPOINT = {\n     'Hyundai': \"https://hyundai_submit_lead.com/\",\n     'BMW': \"https://BMW_submit_lead.com/\"\n }\n\nDB_TABLE_NAME = os.getenv('DB_TABLE_NAME', 'auto-lead-scoring')\nddb_resource = boto3.resource('dynamodb')\ntable = ddb_resource.Table(DB_TABLE_NAME)\ndef get_unsent_lead_on_a_date(val):\n    res = table.query(\n            IndexName='gsi-index',\n            KeyConditionExpression=Key('gsipk').eq(val) & Key('gsisk').begins_with('0#')\n        )\n    return res['Items']\n\ndef get_unsent_leads(oem):\n    todays_date = date.today()\n    previous_date = todays_date - timedelta(days=1)\n\n    leadsa = get_unsent_lead_on_a_date( f\"{oem}#{str(todays_date)}\" )\n    leadsb = get_unsent_lead_on_a_date( f\"{oem}#{str(previous_date)}\" )\n    return leadsa+leadsb\n\ndef lambda_handler(event, context):\n\n    oem = event['oem']\n\n    unsent_leads = get_unsent_leads(oem)\n    logger.info(unsent_leads)\n\n    try:\n        response = requests.post(OEM_ENDPOINT.get(oem, \"\"), data=json.dumps(unsent_leads))\n        return {\n        'statusCode': response.status_code,\n        }\n    except Exception as e:\n        logger.info(f\"exception occured while sending lead top oem endpoint: {e}\")\n        return {\n            \"statusCode\": \"406\"\n        }\n"
+        },
+        "FunctionName": "auto-lead-scoring-scheduler",
+        "Runtime": "python3.7",
+        "Environment": {
+          "Variables": {
+            "DB_TABLE_NAME": "auto-lead-scoring-test"
+          }
+        },
+        "Handler": "index.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaExecutionRole",
+            "Arn"
+          ]
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "98eccdcc-6126-44ae-b4c6-de67e5efbbab"
+        }
+      }
+    },
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DDBPermissions",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DDBPermissions",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:CreateTable",
+                    "dynamodb:PutItem",
+                    "dynamodb:DescribeTable",
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "ec116105-96a9-4f5b-85fb-2a6270c32c6f"
+        }
+      }
+    },
+    "LambdaSQSReceiver": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "ZipFile": "import os \nimport json \nimport boto3 \nimport time \nfrom datetime import datetime, date, timedelta \nimport logging \nfrom boto3.dynamodb.conditions import Key \nimport requests\nlogger = logging.getLogger() \nlogger.setLevel('INFO')\nTABLE_NAME = os.getenv('DDB_TABLE_NAME', 'auto-lead-scoring')\nBUCKET_NAME = os.getenv(\"ALS_QUICKSIGHT_BUCKET_NAME\", \"auto-lead-scoring-quicksight\")\nALS_AWS_SECRET_KEY = os.getenv(\"ALS_AWS_SECRET_KEY\")\nALS_AWS_ACCESS_KEY = os.getenv(\"ALS_AWS_ACCESS_KEY\")\n\ndef get_ddb_table():\n    session = get_boto3_session()\n    resource = session.resource('dynamodb')\n    return resource.Table(TABLE_NAME)\n    \ndef get_boto3_session():\n    \"\"\"\n    Create boto3 session for AWS operations\n    Returns:\n        Returns boto3 session with given credentials\n    \"\"\"\n    logger.info(f'Get boto3 session from credentials')\n    aws_region_name = 'us-east-1'\n    aws_access_key_id = ALS_AWS_ACCESS_KEY\n    aws_secret_access_key = ALS_AWS_SECRET_KEY\n    \n    session = boto3.Session(region_name=aws_region_name, aws_access_key_id=aws_access_key_id,\n                            aws_secret_access_key=aws_secret_access_key)\n                            \n    # check if credentials are valid\n    try:\n        session.client('sts').get_caller_identity()\n        return session\n    except Exception as e:\n        raise Exception('Invalid AWS credentials')\n        \ntable = get_ddb_table() s3_client = get_boto3_session().client('s3')\ndef verify_response(response, data):\n    status_code = response['ResponseMetadata']['HTTPStatusCode']\n    if not status_code == 200:\n        logger.error(f\"Failed to add {data} to the database.\")\n    else:\n        logger.info(f\"New entry {data} added successfully.\")\n        \n        \ndef put_file(item, path):\n    res = s3_client.put_object(\n        Body=json.dumps(item),\n        Bucket=BUCKET_NAME,\n        Key=path\n    )\n    verify_response(res, path)\n    \n    \ndef insert_lead(lead_hash: str, lead_provider: str, response: str):\n    item = {\n        'pk': f'LEAD#{lead_hash}',\n        'sk': lead_provider,\n        'response': response,\n        'ttl': int( (datetime.fromtimestamp(int(time.time()))+ timedelta(days=120)).timestamp())\n    }\n    res = table.put_item(Item=item)\n    verify_response(res, f\"{lead_provider}+'-'+{lead_hash}\")\n    \n    \ndef insert_oem_lead(uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,\n                    timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,\n                    postalcode: str):\n    item = {\n        'pk': f\"{make}#{uuid}\",\n        'sk': f\"{make}#{model}\",\n        'gsipk': f\"{make}#{date}\",\n        'gsisk': \"0#0\",\n        'make': make,\n        'model': model,\n        'email': email,\n        'phone': phone,\n        'last_name': last_name,\n        'timestamp': timestamp,\n        'conversion': \"0\",\n        \"make_model_filter_status\": make_model_filter_status,\n        \"lead_hash\": lead_hash,\n        \"dealer\": dealer,\n        \"3pl\": provider,\n        \"postalcode\": postalcode,\n        'ttl': int( (datetime.fromtimestamp(int(time.time()))+ timedelta(days=30)).timestamp())\n    }\n\n    response = table.put_item(Item=item)\n\n    verify_response(response, f\"{make}#{email}#{phone}#{last_name}\")\n    \n    \ndef insert_customer_lead(uuid: str, email: str, phone: str, last_name: str, make: str, model: str):\n    item = {\n        'pk': uuid,\n        'sk': 'CUSTOMER_LEAD',\n        'gsipk': email,\n        'gsisk': uuid,\n        'gsipk1': f\"{phone}#{last_name}\",\n        'gsisk1': uuid,\n        'oem': make,\n        'make': make,\n        'model': model,\n        'ttl': int( (datetime.fromtimestamp(int(time.time()))+ timedelta(days=30)).timestamp())\n    }\n    res = table.put_item(Item=item)\n\n    verify_response(res, f\"{uuid}#{email}#{phone}\")\n    \n    \ndef lambda_handler(event, context):\n    # TODO implement\n    logger.info(event)\n    body = json.loads(event['Records'][0]['body'])\n    logger.info(f\"body: {body}\" )\n    \n    if 'initialize' in body:\n        return {\n        'statusCode': 200,\n        'body': 'Initialized'\n    }\n    \n    put_file_data = body['put_file']\n    insert_lead_data = body['insert_lead']\n    insert_customer_lead_data = body.get('insert_customer_lead', None)\n    insert_oem_lead_data = body.get('insert_oem_lead', None)\n    \n    put_file(item=put_file_data['item'], path=put_file_data['path'])\n    insert_lead(\n        lead_hash=insert_lead_data['lead_hash'], \n        lead_provider=insert_lead_data['service'],\n        response=insert_lead_data['response'])\n        \n    if insert_customer_lead_data:\n        insert_customer_lead(\n            uuid=insert_customer_lead_data['lead_uuid'],\n            email=insert_customer_lead_data['email'],\n            phone=insert_customer_lead_data['phone'],\n            last_name=insert_customer_lead_data['last_name'],\n            make=insert_customer_lead_data['make'],\n            model=insert_customer_lead_data['model']\n        )\n        \n        insert_oem_lead(\n            uuid=insert_oem_lead_data['lead_uuid'],\n            make=insert_oem_lead_data['make'],\n            model=insert_oem_lead_data['model'],\n            date=insert_oem_lead_data['date'],\n            email=insert_oem_lead_data['email'],\n            phone=insert_oem_lead_data['phone'],\n            last_name=insert_oem_lead_data['last_name'],\n            timestamp=insert_oem_lead_data['timestamp'],\n            make_model_filter_status=insert_oem_lead_data['make_model_filter'],\n            lead_hash=insert_oem_lead_data['lead_hash'],\n            dealer=insert_oem_lead_data['vendor'],\n            provider=insert_oem_lead_data['service'],\n            postalcode=insert_oem_lead_data['postalcode']\n        )\n        \n    return {\n        'statusCode': 200,\n        'body': 'Done'\n    }\n    \n"
+        },
+        "FunctionName": "auto-lead-scoring-sqs-receiver-test",
+        "Runtime": "python3.7",
+        "Environment": {
+          "Variables": {
+            "DDB_TABLE_NAME": "auto-lead-scoring-test",
+            "ALS_QUICKSIGHT_BUCKET_NAME": "auto-lead-scoring-quicksight-test",
+            "ALS_AWS_SECRET_KEY": "<Your ALS AWS SECRET KEY>",
+            "ALS_AWS_ACCESS_KEY": "<Your ALS AWS ACCESS KEY>"
+          }
+        },
+        "Handler": "index.lambda_handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaExecutionRoleForSQS",
+            "Arn"
+          ]
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "98eccdcc-6126-44ae-b4c6-de67e5efbbab"
+        }
+      }
+    },
+    "LambdaExecutionRoleForSQS": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DDBandSQSPermissions",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DDBandSQSPermissions",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:CreateTable",
+                    "dynamodb:PutItem",
+                    "dynamodb:DescribeTable",
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:UpdateItem",
+                    "sqs:DeleteMessage",
+                    "sqs:ReceiveMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "ec116105-96a9-4f5b-85fb-2a6270c32c6f"
+        }
+      }
+    },
+    "LambdaFunctionEventSourceMapping": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "Enabled": true,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "ALSSQS",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LambdaSQSReceiver",
+            "Arn"
+          ]
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "7673073e-2697-4e2c-9e6f-779b203e6752"
+        }
+      }
+    },
+    "ALSSQS": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "auto-lead-scoring-sqs-test"
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "9db728b4-a830-4f7e-a9b2-ac237f192d80"
+        }
+      }
+    }
+  }
+}
