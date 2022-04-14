@@ -191,7 +191,7 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
                 'service': provider
             }
         }
-        item, path = create_quicksight_data(obj, 'unknown_hash', 'REJECTED', '1_INVALID_XML')
+        item, path = create_quicksight_data(obj, 'unknown_hash', 'REJECTED', '1_INVALID_XML', {})
         s3_helper_client.put_file(item, path)
         return {
             "status": "REJECTED",
@@ -220,7 +220,7 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
     logger.info(f"ADF Validation took: {calculate_time(t1)} ms")
 
     if not validation_check:
-        item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, 'REJECTED', validation_code)
+        item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, 'REJECTED', validation_code, {})
         s3_helper_client.put_file(item, path)
         return {
             "status": "REJECTED",
@@ -289,7 +289,7 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
     # create and dump data for quicksight analysis
     logger.info(f"Validating customer took: {calculate_time(t1)} ms")
     item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
-                                        response_body['code'])
+                                        response_body['code'], model_input)
 
     # insert the lead into ddb with oem details
     # delegate inserts to sqs queue
