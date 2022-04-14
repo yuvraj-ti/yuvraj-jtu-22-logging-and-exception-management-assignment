@@ -21,17 +21,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_quicksight_data(lead_hash, item):
+def get_quicksight_data(lead_uuid, item):
     """
             Creates the lead converted data for dumping into S3.
             Args:
-                lead_hash: Lead Hash
+                lead_uuid: Lead UUID
                 item: Accepted lead info pulled from DDB
             Returns:
                 S3 data
     """
     data = {
-        "lead_hash": lead_hash,
+        "lead_hash": lead_uuid,
         "epoch_timestamp": int(time.time()),
         "make": item['make'],
         "model": item['model'],
@@ -41,7 +41,7 @@ def get_quicksight_data(lead_hash, item):
         "3pl": item.get('3pl', 'unknown'),
         "oem_responded": 1
     }
-    return data, f"1#{item['make']}#{item['model']}#{lead_hash}"
+    return data, f"1#{item['make']}#{item['model']}#{lead_uuid}"
 
 
 @router.post("/conversion")

@@ -288,13 +288,13 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
     # Inserting all data parallely
     # create and dump data for quicksight analysis
     logger.info(f"Validating customer took: {calculate_time(t1)} ms")
-    item, path = create_quicksight_data(obj['adf']['prospect'], lead_hash, response_body['status'],
+    lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
+    item, path = create_quicksight_data(obj['adf']['prospect'], lead_uuid, response_body['status'],
                                         response_body['code'], model_input)
 
     # insert the lead into ddb with oem details
     # delegate inserts to sqs queue
     if response_body['status'] == 'ACCEPTED':
-        lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
         make_model_filter = db_helper_session.get_make_model_filter_status(make)
         logger.info(f"make_model_filter took: {calculate_time(t1)} ms")
         message = {
