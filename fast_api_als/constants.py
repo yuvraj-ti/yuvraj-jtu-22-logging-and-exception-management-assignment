@@ -77,3 +77,8 @@ SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME', 'auto-lead-scoring')
 # TTL
 LEAD_ITEM_TTL = 120
 OEM_ITEM_TTL = 30
+
+# Athena
+ATHENA_DATABASE_NAME = os.getenv('ATHENA_DATABASE_NAME', 'als')
+ATHENA_QUERY_BUCKET = os.getenv('ATHENA_QUERY_BUCKET', 'als-athena-query-result')
+
