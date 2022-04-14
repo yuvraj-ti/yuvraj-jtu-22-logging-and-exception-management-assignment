@@ -289,6 +289,7 @@ async def submit1(file: Request, apikey: APIKey = Depends(get_api_key)):
     # create and dump data for quicksight analysis
     logger.info(f"Validating customer took: {calculate_time(t1)} ms")
     lead_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, email + phone + last_name + make + model))
+    logger.info(f"lead uuid: {lead_uuid}")
     item, path = create_quicksight_data(obj['adf']['prospect'], lead_uuid, response_body['status'],
                                         response_body['code'], model_input)
 
