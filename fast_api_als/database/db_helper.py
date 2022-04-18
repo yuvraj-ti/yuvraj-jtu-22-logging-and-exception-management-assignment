@@ -152,7 +152,7 @@ class DBHelper:
         return item[0]['sk']
 
     def set_auth_key(self, username: str):
-        self.delete_oem(username)
+        self.delete_3PL(username)
         apikey = str(uuid.uuid4())
         res = self.table.put_item(
             Item={
