@@ -276,8 +276,8 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
 async def view_authkey(request: Request, token: str = Depends(get_token)):
     body = await request.body()
     body = json.loads(body)
-    logger.info(f"Api key view requested by {body['3pl']}: {body['role']}")
     provider, role = get_user_role(token, cognito_client)
+    logger.info(f"Api key view requested by {provider}: {role}")
     if role != "ADMIN" and role != "3PL":
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
