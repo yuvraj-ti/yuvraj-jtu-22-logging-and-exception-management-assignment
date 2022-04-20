@@ -11,7 +11,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_quicksight_data(obj, lead_hash, status, code):
+def create_quicksight_data(obj, lead_hash, status, code, model_input):
+    """
+        Creates the data for dumping into S3.
+        Args:
+            obj: Lead Object
+            lead_hash: Lead hash
+            status: ACCEPTED or REJECTED
+            code: Response code
+        Returns:
+            S3 data
+    """
     item = {
         "lead_hash": lead_hash,
         "status": status,
@@ -25,7 +35,8 @@ def create_quicksight_data(obj, lead_hash, status, code):
         "phone_provided": 1 if obj.get('customer', {}).get('contact', {}).get('phone', None) else 0,
         "3pl": obj.get('provider', {}).get('service', 'unknown'),
         "dealer": obj.get('vendor', {}).get('id', {}).get('#text', 'unknown') + "_" + obj.get('vendor', {}).get(
-            'vendorname', 'unknown')
+            'vendorname', 'unknown'),
+        "enrichment": model_input
     }
     return item, f"{obj.get('vehicle', {}).get('make', 'unknown')}/{item['epoch_timestamp']}_0_{lead_hash}"
 

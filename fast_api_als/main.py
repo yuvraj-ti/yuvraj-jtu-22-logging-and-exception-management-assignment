@@ -2,14 +2,17 @@ import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fast_api_als.routers import users, submit_lead, test_api
+from fast_api_als.routers import users, submit_lead, test_api, lead_conversion, reinforcement
 
 app = FastAPI()
 app.include_router(users.router)
 app.include_router(submit_lead.router)
+app.include_router(lead_conversion.router)
+app.include_router(reinforcement.router)
 
 # only present during test development
-app.include_router(test_api.router)
+# app.include_router(test_api.router)
+
 origins = ["*"]
 app.add_middleware(
     CORSMiddleware,

@@ -14,3 +14,4 @@ httpx==0.22.0
 py3-validate-email==1.0.5
 phonenumbers==8.12.45
 dynamodbgeo==0.0.3
+python-Levenshtein==0.12.2

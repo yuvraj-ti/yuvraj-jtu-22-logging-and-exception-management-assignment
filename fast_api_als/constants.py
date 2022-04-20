@@ -17,14 +17,28 @@ HYU_NO_DEALER_ENDPOINT_NAME = os.getenv('HYU_NO_DEALER_ENDPOINT_NAME')
 # BMW Endpoint Constants
 BMW_DEALER_ENDPOINT_NAME = os.getenv('BMW_DEALER_ENDPOINT_NAME')
 
-# Admin Constants
-SUPPORTED_OEMS = ["hyundai", "bmw"]
+# MASERATI Endpoint Constants
+MAS_DEALER_ENDPOINT_NAME = os.getenv('MAS_DEALER_ENDPOINT_NAME')
 
+# General Model Constants
+GEN_DEALER_ENDPOINT_NAME = os.getenv('GEN_DEALER_ENDPOINT_NAME')
+
+# Admin Constants
+SUPPORTED_OEMS = ["hyundai", "bmw", "maserati"]
+DEFAULT_OEM_LIMIT = os.getenv("DEFAULT_OEM_LIMIT", "0.036779455840587616")
 # Data Tool 3rd Party Service Constants
 ALS_DATA_TOOL_REQUEST_KEY = os.getenv('ALS_DATA_TOOL_REQUEST_KEY')
 ALS_DATA_TOOL_SERVICE_URL = os.getenv('ALS_DATA_TOOL_SERVICE_URL')
 ALS_DATA_TOOL_PHONE_VERIFY_METHOD = os.getenv('ALS_DATA_TOOL_PHONE_VERIFY_METHOD')
 ALS_DATA_TOOL_EMAIL_VERIFY_METHOD = os.getenv('ALS_DATA_TOOL_EMAIL_VERIFY_METHOD')
+
+# Numverify Constants
+NUM_VERIFY_ACCESS_KEY = os.getenv('NUM_VERIFY_ACCESS_KEY')
+NUM_VERIFY_URL = os.getenv('NUM_VERIFY_URL')
+
+# Towerdata Constants
+TOWER_DATA_URL = os.getenv('TOWER_DATA_URL')
+TOWER_DATA_API_KEY = os.getenv('TOWER_DATA_API_KEY')
 
 # S3 bucket for lead dumping
 S3_BUCKET_NAME = os.getenv("ALS_QUICKSIGHT_BUCKET_NAME", "auto-lead-scoring-quicksight")
@@ -57,3 +71,14 @@ LEAD_PROVIDERSERVICE_RATION = "0.044290802250891076"
 HOUSEHOLD_INCOME = 55319.39
 POPULATION_DENSITY = 3585.81
 
+# SQS Queue
+SQS_QUEUE_NAME = os.getenv('SQS_QUEUE_NAME', 'auto-lead-scoring')
+
+# TTL
+LEAD_ITEM_TTL = 120
+OEM_ITEM_TTL = 30
+
+# Athena
+ATHENA_DATABASE_NAME = os.getenv('ATHENA_DATABASE_NAME', 'als')
+ATHENA_QUERY_BUCKET = os.getenv('ATHENA_QUERY_BUCKET', 'als-athena-query-result')
+ATHENA_TABLE_NAME = os.getenv('ATHENA_TABLE_NAME', 'auto_lead_scoring')

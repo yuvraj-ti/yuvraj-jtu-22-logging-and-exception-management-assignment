@@ -1,4 +1,4 @@
-column_list_bmw_dealer = ['DistanctToVendor',
+column_list_mas_dealer = ['DistanctToVendor',
                           'FirstLastPropCase',
                           'NameEmailCheck',
                           'NamenMail_Proper',
@@ -17,7 +17,7 @@ column_list_bmw_dealer = ['DistanctToVendor',
                           'EmailDomainCat_Ratio',
                           'lead_ProviderService_Ratio']
 
-initial_ml_input_bmw_dealer = {
+initial_ml_input_mas_dealer = {
     "DistanctToVendor": 0,
     "FirstLastPropCase": 0,
     "NameEmailCheck": 0,
@@ -104,6 +104,6 @@ initial_ml_input_bmw_dealer = {
     "OCR_cat_good": 0,
     "OCR_cat_normal": 0,
     "OCR_cat_worst": 0,
-    "EmailDomainCat_Ratio": 0,
-    "lead_ProviderService_Ratio": 0,
+    "EmailDomainCat_Ratio": 0.04438530340664647,
+    "lead_ProviderService_Ratio": 0.044290802250891076,
 }

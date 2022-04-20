@@ -2,8 +2,10 @@ import uuid
 import logging
 import time
 import boto3
+import botocore
 from boto3.dynamodb.conditions import Key
 import dynamodbgeo
+from datetime import datetime, timedelta
 
 from fast_api_als import constants
 from fast_api_als.utils.boto3_utils import get_boto3_session
@@ -18,32 +20,39 @@ logger = logging.getLogger(__name__)
 class DBHelper:
     def __init__(self, session: boto3.session.Session):
         self.session = session
-        self.ddb_resource = session.resource('dynamodb')
+        self.ddb_resource = session.resource('dynamodb', config=botocore.client.Config(max_pool_connections=99))
         self.table = self.ddb_resource.Table(constants.DB_TABLE_NAME)
         self.geo_data_manager = self.get_geo_data_manager()
         self.dealer_table = self.ddb_resource.Table(constants.DEALER_DB_TABLE)
+        self.get_api_key_author("Initialize_Connection")
 
     def get_geo_data_manager(self):
-        config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb'), constants.DEALER_DB_TABLE)
+        config = dynamodbgeo.GeoDataManagerConfiguration(self.session.client('dynamodb', config=botocore.client.Config(max_pool_connections=99)), constants.DEALER_DB_TABLE)
         geo_data_manager = dynamodbgeo.GeoDataManager(config)
         return geo_data_manager
 
     def insert_lead(self, lead_hash: str, lead_provider: str, response: str):
-        logger.info(f"Inserting lead from {lead_provider} with response as {response}")
+        # logger.info(f"Inserting lead from {lead_provider} with response as {response}")
+        t1 = int(time.time() * 1000)
         item = {
             'pk': f'LEAD#{lead_hash}',
             'sk': lead_provider,
-            'response': response
+            'response': response,
+            'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.LEAD_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
+        logger.info(
+            f"Inserted lead from {lead_provider} with response as {response} took: {int(time.time() * 1000) - t1}ms")
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
-                        timestamp: str, make_model_filter_status: str, lead_hash: str):
+                        timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,
+                        postalcode: str):
+        t1 = int(time.time() * 1000)
 
         item = {
             'pk': f"{make}#{uuid}",
-            'sk': f"{make}#{model}" if make_model_filter_status else "",
+            'sk': f"{make}#{model}",
             'gsipk': f"{make}#{date}",
             'gsisk': "0#0",
             'make': make,
@@ -52,13 +61,18 @@ class DBHelper:
             'phone': phone,
             'last_name': last_name,
             'timestamp': timestamp,
-            'conversion_status': "0",
+            'conversion': "0",
             "make_model_filter_status": make_model_filter_status,
-            "lead_hash": lead_hash
+            "lead_hash": lead_hash,
+            "dealer": dealer,
+            "3pl": provider,
+            "postalcode": postalcode,
+            'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
 
         response = self.table.put_item(Item=item)
         verify_add_entry_response(response, f"{make}#{email}#{phone}#{last_name}")
+        logger.info(f"Inserted oem lead for {make} {model} took: {int(time.time() * 1000) - t1}ms")
 
     def check_duplicate_api_call(self, lead_hash: str, lead_provider: str):
         res = self.table.get_item(
@@ -69,9 +83,19 @@ class DBHelper:
         )
         item = res.get('Item')
         if not item:
-            return False, ""
+            return {
+                "Duplicate_Api_Call": {
+                    "status": False,
+                    "response": "No_Duplicate_Api_Call"
+                }
+            }
         else:
-            return True, item['response']
+            return {
+                "Duplicate_Api_Call": {
+                    "status": True,
+                    "response": item['response']
+                }
+            }
 
     def accepted_lead_not_sent_for_oem(self, oem: str, date: str):
         res = self.table.query(
@@ -80,21 +104,6 @@ class DBHelper:
                                    & Key('gsisk').begins_with("0#0")
         )
         return res.get('Items', [])
-
-    def update_lead_conversion_status(self, uuid: str, oem: str, make: str, model: str):
-        res = self.table.get_item(
-            Key={
-                'pk': f"{uuid}#{oem}"
-            }
-        )
-        item = res['Item']
-        if not item:
-            logger.info(f"No item found for {uuid}#{oem}#{make}#{model}")
-            return False
-        item['gsisk'] = item['gsisk'][0] + "#" + "1"
-        res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, f"{uuid}#{oem}#{make}#{model}")
-        return True
 
     def update_lead_sent_status(self, uuid: str, oem: str, make: str, model: str):
         res = self.table.get_item(
@@ -133,27 +142,27 @@ class DBHelper:
             return False
         return True
 
-    def get_api_key(self, username: str):
+    def get_auth_key(self, username: str):
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(username)
         )
         item = res['Items']
         if len(item) == 0:
-            return "3PL doesn't exist"
+            return None
         return item[0]['sk']
 
-    def set_auth_key(self, username):
-        apikey = uuid.uuid4().hex
+    def set_auth_key(self, username: str):
+        self.delete_3PL(username)
+        apikey = str(uuid.uuid4())
         res = self.table.put_item(
             Item={
                 'pk': username,
                 'sk': apikey,
-                'gsipk': apikey,
-                'gsisk': username
+                'gsipk': apikey
             }
         )
+        verify_add_entry_response(res, username)
         return apikey
-
 
     def register_3PL(self, username: str):
         res = self.table.query(
@@ -168,23 +177,69 @@ class DBHelper:
         item = self.fetch_oem_data(oem)
         item['settings']['make_model'] = make_model
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem+make_model)
+        verify_add_entry_response(res, oem + make_model)
 
-    def fetch_oem_data(self, oem):
+    def fetch_oem_data(self, oem, parallel=False):
         res = self.table.get_item(
             Key={
                 'pk': f"OEM#{oem}",
                 'sk': "METADATA"
             }
         )
-        return res['Item']
+        if 'Item' not in res:
+            return {}
+        if parallel:
+            return {
+                "fetch_oem_data": res['Item']
+            }
+        else:
+            return res['Item']
+
+    def create_new_oem(self, oem: str, make_model: str, threshold: str):
+        res = self.table.put_item(
+            Item={
+                'pk': f"OEM#{oem}",
+                'sk': "METADATA",
+                'settings': {
+                    'make_model': make_model
+                },
+                'threshold': threshold
+            }
+        )
+        verify_add_entry_response(res, oem)
+
+    def delete_oem(self, oem: str):
+        res = self.table.delete_item(
+            Key={
+                'pk': f"OEM#{oem}",
+                'sk': "METADATA"
+            }
+        )
+        verify_add_entry_response(res, oem+"#Delete")
+
+    def delete_3PL(self, username: str):
+        authkey = self.get_auth_key(username)
+        if authkey:
+            res = self.table.delete_item(
+                Key={
+                    'pk': username,
+                    'sk': authkey
+                }
+            )
+            verify_add_entry_response(res, username)
 
     def set_oem_threshold(self, oem: str, threshold: str):
         item = self.fetch_oem_data(oem)
+        if item == {}:
+            return {
+                "error": f"OEM {oem} not found"
+            }
         item['threshold'] = threshold
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem+threshold)
-
+        verify_add_entry_response(res, oem + threshold)
+        return {
+            "success": f"OEM {oem} threshold set to {threshold}"
+        }
 
     def fetch_nearest_dealer(self, oem: str, lat: str, lon: str):
         query_input = {
@@ -196,7 +251,7 @@ class DBHelper:
         res = self.geo_data_manager.queryRadius(
             dynamodbgeo.QueryRadiusRequest(
                 dynamodbgeo.GeoPoint(lat, lon),
-                50000,                                      # radius = 50km
+                50000,  # radius = 50km
                 query_input,
                 sort=True
             )
@@ -208,6 +263,7 @@ class DBHelper:
             'id': {
                 '#text': res['dealerCode']['S']
             },
+            'vendorname': res['dealerName']['S'],
             'contact': {
                 'address': {
                     'postalcode': res['dealerZip']['S']
@@ -235,6 +291,7 @@ class DBHelper:
         }
 
     def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, make: str, model: str):
+        t1 = int(time.time() * 1000.0)
         item = {
             'pk': uuid,
             'sk': 'CUSTOMER_LEAD',
@@ -244,10 +301,12 @@ class DBHelper:
             'gsisk1': uuid,
             'oem': make,
             'make': make,
-            'model': model
+            'model': model,
+            'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
         verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
+        logger.info(f"inserted customer lead {uuid} took: {int(time.time() * 1000.0) - t1}ms")
 
     def lead_exists(self, uuid: str, make: str, model: str):
         lead_exist = False
@@ -278,9 +337,9 @@ class DBHelper:
 
         for item in customer_leads:
             if self.lead_exists(item['pk'], make, model):
-                return True
+                return {"Duplicate_Lead": True}
         logger.info(f"No duplicate lead for {email}#{phone}#{last_name}")
-        return False
+        return {"Duplicate_Lead": False}
 
     def get_api_key_author(self, apikey):
         res = self.table.query(
@@ -291,6 +350,21 @@ class DBHelper:
         if len(item) == 0:
             return "unknown"
         return item[0].get("pk", "unknown")
+
+    def update_lead_conversion(self, lead_uuid: str, oem: str, converted: int):
+        res = self.table.query(
+            KeyConditionExpression=Key('pk').eq(f"{oem}#{lead_uuid}")
+        )
+        items = res.get('Items')
+        if len(items) == 0:
+            return False, {}
+        item = items[0]
+        item['oem_responded'] = 1
+        item['conversion'] = converted
+        item['gsisk'] = f"1#{converted}"
+        res = self.table.put_item(Item=item)
+        verify_add_entry_response(res, item['pk'])
+        return True, item
 
 
 def verify_add_entry_response(response, data):
