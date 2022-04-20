@@ -5,7 +5,6 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks
 import logging
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from starlette.status import HTTP_403_FORBIDDEN
 
@@ -15,7 +14,6 @@ from fast_api_als.constants import (
 from fast_api_als.utils.sqs_utils import sqs_helper_session
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.quicksight.s3_helper import s3_helper_client
-from fast_api_als.services.alternate_verify_phone_and_email import alternate_verify_phone_and_email
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich.demographic_data import get_customer_coordinate
 from fast_api_als.services.enrich_lead import get_enriched_lead_json

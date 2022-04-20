@@ -10,7 +10,6 @@ from fastapi.security.api_key import APIKey
 from starlette.status import HTTP_403_FORBIDDEN
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from fast_api_als.constants import SUPPORTED_OEMS
 from fast_api_als.services.authenticate import get_api_key
 from fast_api_als.services.enrich.customer_info import get_contact_details
 from fast_api_als.services.enrich.demographic_data import get_customer_coordinate
@@ -19,7 +18,7 @@ from fast_api_als.services.new_verify_phone_and_email import new_verify_phone_an
 from fast_api_als.utils.adf import parse_xml, check_validation
 from fast_api_als.utils.calculate_lead_hash import calculate_lead_hash
 from fast_api_als.database.db_helper import db_helper_session
-from fast_api_als.services.ml_helper import conversion_to_ml_input, score_ml_input, check_threshold
+from fast_api_als.services.ml_helper import conversion_to_ml_input, score_ml_input
 from fast_api_als.utils.quicksight_utils import create_quicksight_data
 from fast_api_als.quicksight.s3_helper import s3_helper_client
 from fast_api_als.utils.sqs_utils import sqs_helper_session
@@ -245,7 +244,7 @@ async def submit(file: Request, background_tasks: BackgroundTasks, apikey: APIKe
         logger.info(f"Storing lead parallely took: {calculate_time(t1)} ms")
     time_taken = (int(time.time() * 1000.0) - start)
 
-    response_body["message"] = f"{result} Response Time : {time_taken} ms"
+    response_message = f"{result} Response Time : {time_taken} ms"
     logger.info(
-        f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_body['message']}")
+        f"Lead {response_body['status']} with code: {response_body['code']} and message: {response_message}")
     return response_body

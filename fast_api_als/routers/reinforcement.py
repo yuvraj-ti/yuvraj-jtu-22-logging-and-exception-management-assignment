@@ -22,15 +22,15 @@ cognito_client = session.client('cognito-idp')
 
 
 @router.post("/reinforcement/")
-async def submit(cred: Request, token: str = Depends(get_token)):
+async def reinforcement(cred: Request, token: str = Depends(get_token)):
     body = await cred.body()
     body = json.loads(body)
     name, role = get_user_role(token, cognito_client)
-    if role != "OEM":
-        return {
-            "status": status.HTTP_401_UNAUTHORIZED,
-            "message": "Unauthorised"
-        }
+    if role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="You are not authorized to access this resource"
+        )
     if 'oem' not in body or 'epoch_timestamp' not in body:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OEM or Epoch Timestamp"

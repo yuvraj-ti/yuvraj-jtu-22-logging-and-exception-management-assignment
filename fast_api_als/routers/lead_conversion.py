@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 session = get_boto3_session()
 cognito_client = session.client('cognito-idp')
 
+
 def get_quicksight_data(lead_uuid, item):
     """
             Creates the lead converted data for dumping into S3.
@@ -48,15 +49,12 @@ def get_quicksight_data(lead_uuid, item):
 
 
 @router.post("/conversion")
-async def submit(file: Request, token: str = Depends(get_token) ):
+async def submit(file: Request, token: str = Depends(get_token)):
     body = await file.body()
     body = json.loads(str(body, 'utf-8'))
 
     if 'lead_uuid' not in body or 'converted' not in body:
-        return {
-            "status": status.HTTP_400_BAD_REQUEST,
-            "message": "Missing lead_uuid or converted"
-        }
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing required fields")
     lead_uuid = body['lead_uuid']
     converted = body['converted']
 
@@ -76,7 +74,6 @@ async def submit(file: Request, token: str = Depends(get_token) ):
             "message": "Lead Conversion Status Update"
         }
     else:
-        return {
-            "status_code": status.HTTP_400_BAD_REQUEST,
-            "message": "Wrong UUID, Lead Doesn't exist"
-        }
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Wrong UUID, Lead Doesn't exist")
