@@ -2,13 +2,15 @@ import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fast_api_als.routers import users, submit_lead, test_api, lead_conversion, reinforcement
+from fast_api_als.routers import users, submit_lead, lead_conversion, reinforcement, oem, three_pl
 
 app = FastAPI()
 app.include_router(users.router)
 app.include_router(submit_lead.router)
 app.include_router(lead_conversion.router)
 app.include_router(reinforcement.router)
+app.include_router(oem.router)
+app.include_router(three_pl.router)
 
 # only present during test development
 # app.include_router(test_api.router)
@@ -25,7 +27,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Hello, world!"}
+    return {"message": "Welcome to Trilogy Auto Lead Scoring"}
 
 
 @app.get("/ping")
