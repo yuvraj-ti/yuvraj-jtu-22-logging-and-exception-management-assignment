@@ -117,15 +117,15 @@ async def register_user(cred: Request, token: str = Depends(get_token)):
     body = json.loads(body)
     name, user_role = get_user_role(token, cognito_client)
     if user_role != "ADMIN":
-        return {
-            "status": HTTP_401_UNAUTHORIZED,
-            "message": "Unauthorised"
-        }
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail=f"Unauthorised")
+
     if 'email' not in body or 'role' not in body or 'name' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing email, role or name"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing email, role or name"
+        )
 
     email, role, name = body['email'], body['role'], body['name']
     if role not in ("OEM", "3PL", "ADMIN"):
@@ -156,10 +156,10 @@ async def set_oem_setting(request: Request, token: str = Depends(get_token)):
     body = json.loads(body)
 
     if 'oem' not in body or 'make_model' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing OEM or make_model"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing oem or make_model"
+        )
 
     oem, make_model = body['oem'], body['make_model']
     name, role = get_user_role(token, cognito_client)
@@ -181,10 +181,10 @@ async def view_oem_setting(request: Request, token: str = Depends(get_token)):
     body = json.loads(body)
 
     if 'oem' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing oem"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing oem"
+        )
 
     oem = body['oem']
     name, role = get_user_role(token, cognito_client)
@@ -206,10 +206,10 @@ async def set_oem_threshold(request: Request, token: str = Depends(get_token)):
     body = json.loads(body)
 
     if 'oem' not in body or 'threshold' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing oem or threshold"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing oem or threshold"
+        )
     oem, threshold = body['oem'], body['threshold']
     name, role = get_user_role(token, cognito_client)
     if role != "ADMIN" and (role != "OEM" or name != oem):
@@ -229,10 +229,10 @@ async def view_oem_threshold(request: Request, token: str = Depends(get_token)):
     body = json.loads(body)
 
     if 'oem' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing oem"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing oem"
+        )
     logger.info(f"Oem threshold view by: {body['oem']}")
     oem = body['oem']
     name, role = get_user_role(token, cognito_client)
@@ -311,10 +311,10 @@ async def view_all_users_by_role(request: Request, token: str = Depends(get_toke
     body = await request.body()
     body = json.loads(body)
     if 'role' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing role"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing role"
+        )
     user_role = body['role']
     name, role = get_user_role(token, cognito_client)
     logger.info(f"User list for {user_role} requested by {name}, {role}")
@@ -339,10 +339,10 @@ async def delete_user(request: Request, token: str = Depends(get_token)):
             status_code=HTTP_401_UNAUTHORIZED,
             detail=f"Not Authorized")
     if 'username' not in body:
-        return {
-            "status": HTTP_400_BAD_REQUEST,
-            "message": "Missing username"
-        }
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Missing username"
+        )
     logger.info(f"Delete user request: {body['username']}")
     username = body['username']
     res, role = congito_delete_user(username, cognito_client)
@@ -356,9 +356,8 @@ async def delete_user(request: Request, token: str = Depends(get_token)):
             "status_code": HTTP_200_OK,
             "message": "User deleted successfully"
         }
-
-    return {
-        "status_code": HTTP_400_BAD_REQUEST,
-        "message": res
-    }
+    raise HTTPException(
+        status_code=HTTP_400_BAD_REQUEST,
+        detail=f"User deletion failed"
+    )
 
