@@ -1,11 +1,14 @@
 from fastapi import HTTPException
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
-
 from fast_api_als.constants import ALS_USER_POOL_ID
+from fast_api_als.utils.boto3_utils import get_boto3_session
+
+session = get_boto3_session()
+cognito_client = session.client('cognito-idp')
 
 
-def get_user_role(token: str, cognito_client):
+def get_user_role(token: str):
     """
         Finds the role from the token.
         Args:
@@ -30,7 +33,7 @@ def get_user_role(token: str, cognito_client):
     return user_attribute.get('custom:name', ''), user_attribute.get('custom:role', '')
 
 
-def register_new_user(email: str, name: str, role: str, cognito_client):
+def register_new_user(email: str, name: str, role: str):
     """
         Registers a new user.
     Args:
@@ -62,7 +65,7 @@ def register_new_user(email: str, name: str, role: str, cognito_client):
         return "REJECT"
 
 
-def fetch_all_users(cognito_client):
+def fetch_all_users():
     """
         Fetches all the users.
     Args:
@@ -83,7 +86,7 @@ def fetch_all_users(cognito_client):
     return users
 
 
-def fetch_all_users_by_role(role, cognito_client):
+def fetch_all_users_by_role(role):
     """
         Fetches all the users by role.
     Args:
@@ -113,7 +116,7 @@ def fetch_all_users_by_role(role, cognito_client):
     return users
 
 
-def find_sub_by_name(username, cognito_client):
+def find_sub_by_name(username):
     """
         Finds the sub by name.
     Args:
@@ -137,7 +140,7 @@ def find_sub_by_name(username, cognito_client):
     )
 
 
-def congito_delete_user(username, cognito_client):
+def congito_delete_user(username):
     """
         Deletes a user.
     Args:
@@ -147,7 +150,7 @@ def congito_delete_user(username, cognito_client):
     Returns:
         The success or reject response.
     """
-    sub, role = find_sub_by_name(username, cognito_client)
+    sub, role = find_sub_by_name(username)
     res = cognito_client.admin_delete_user(
         UserPoolId=ALS_USER_POOL_ID,
         Username=sub

@@ -10,7 +10,6 @@ from starlette import status
 from fast_api_als.database.db_helper import db_helper_session
 from fast_api_als.quicksight.s3_helper import s3_helper_client
 from fast_api_als.services.authenticate import get_token
-from fast_api_als.utils.boto3_utils import get_boto3_session
 from fast_api_als.utils.cognito_client import get_user_role
 
 router = APIRouter()
@@ -20,9 +19,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)0.8s] %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-session = get_boto3_session()
-cognito_client = session.client('cognito-idp')
 
 
 def get_quicksight_data(lead_uuid, item):
@@ -58,7 +54,7 @@ async def submit(file: Request, token: str = Depends(get_token)):
     lead_uuid = body['lead_uuid']
     converted = body['converted']
 
-    oem, role = get_user_role(token, cognito_client)
+    oem, role = get_user_role(token)
     logger.info(f"Submit Lead conversion status: {oem}, {role} ")
     if role != "OEM":
         raise HTTPException(
