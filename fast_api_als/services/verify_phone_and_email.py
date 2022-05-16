@@ -8,16 +8,12 @@ from fast_api_als.constants import (
     ALS_DATA_TOOL_SERVICE_URL,
     ALS_DATA_TOOL_REQUEST_KEY)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)0.8s] %(message)s",
-)
-logger = logging.getLogger(__name__)
-
+"""
+How can you write log to understand what's happening in the code?
+You also trying to undderstand the execution time factor.
+"""
 
 async def call_validation_service(url: str, topic: str, value: str, data: dict) -> None:  # 2
-    t1 = int(time.time()*1000.0)
-    logger.info(f"{topic} :{value} validation started at: {t1} ")
     if value == '':
         return
     async with httpx.AsyncClient() as client:  # 3
@@ -25,12 +21,9 @@ async def call_validation_service(url: str, topic: str, value: str, data: dict) 
 
     r = response.json()
     data[topic] = r
-    logger.info(f"{topic} :{value} validation finished at {int(time.time()*1000.0)} and took : {int(time.time()*1000.0)-t1} ms ")
-
+    
 
 async def verify_phone_and_email(email: str, phone_number: str) -> bool:
-    start = int(time.time()*1000.0)
-    logger.info(f"Phone :{phone_number} and Email: {email} Validation started at: {start} ")
     email_validation_url = '{}?Method={}&RequestKey={}&EmailAddress={}&OutputFormat=json'.format(
         ALS_DATA_TOOL_SERVICE_URL,
         ALS_DATA_TOOL_EMAIL_VERIFY_METHOD,
@@ -55,6 +48,4 @@ async def verify_phone_and_email(email: str, phone_number: str) -> bool:
     if "phone" in data:
         if data["phone"]["DtResponse"]["Result"][0]["IsValid"] == "True":
             phone_valid = True
-    logger.info(
-        f"isPhoneVerified :{phone_valid} and idEmailValid: {email_valid} finished in: {int(time.time()*1000.0)-start} ms ")
     return email_valid | phone_valid

@@ -1,17 +1,10 @@
 import xmltodict
 from jsonschema import validate, draft7_format_checker
 import logging
-from .adf_schema import schema
 from uszipcode import SearchEngine
 import re
 
-from ..constants import SUPPORTED_OEMS
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)0.8s] %(message)s",
-)
-logger = logging.getLogger(__name__)
 
 # ISO8601 datetime regex
 regex = r'^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]+)?(Z|[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$'
@@ -45,12 +38,9 @@ def is_nan(x):
 
 
 def parse_xml(adf_xml):
-    try:
-        obj = xmltodict.parse(adf_xml)
-        return obj
-    except Exception as e:
-        logger.info(f"error in parsing input xml: {e}")
-        return None
+    # use exception handling
+    obj = xmltodict.parse(adf_xml)
+    return obj
 
 
 def validate_adf_values(input_json):
@@ -69,7 +59,6 @@ def validate_adf_values(input_json):
             last_name = True
 
     if not first_name or not last_name:
-        logger.info(f"name is incomplete")
         return {"status": "REJECTED", "code": "6_MISSING_FIELD", "message": "name is incomplete"}
 
     if not email and not phone:
@@ -77,7 +66,6 @@ def validate_adf_values(input_json):
 
     # zipcode validation
     res = zipcode_search.by_zipcode(zipcode)
-    logger.info(f"zipcode search results: {res}")
     if not res:
         return {"status": "REJECTED", "code": "4_INVALID_ZIP", "message": "Invalid Postal Code"}
 
@@ -87,12 +75,10 @@ def validate_adf_values(input_json):
         if id['@source'] == 'TCPA_Consent' and id['#text'].lower() == 'yes':
             tcpa_consent = True
     if not email and not tcpa_consent:
-        logger.info("TCPA Consent found as NO")
         return {"status": "REJECTED", "code": "7_NO_CONSENT", "message": "Contact Method missing TCPA consent"}
 
     # request date in ISO8601 format
     if not validate_iso8601(input_json['requestdate']):
-        logger.info("Datetime is not in ISO8601 format")
         return {"status": "REJECTED", "code": "3_INVALID_FIELD", "message": "Invalid DateTime"}
 
     return {"status": "OK"}
@@ -106,7 +92,6 @@ def check_validation(input_json):
             schema=schema,
             format_checker=draft7_format_checker,
         )
-        logger.info(f"input is validated")
         response = validate_adf_values(input_json)
         if response['status'] == "REJECTED":
             return False, response['code'], response['message']

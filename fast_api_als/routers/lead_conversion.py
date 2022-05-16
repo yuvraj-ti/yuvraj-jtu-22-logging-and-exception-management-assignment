@@ -4,7 +4,6 @@ import logging
 import time
 
 from fastapi import Request
-from starlette.exceptions import HTTPException
 from starlette import status
 
 from fast_api_als.database.db_helper import db_helper_session
@@ -14,12 +13,9 @@ from fast_api_als.utils.cognito_client import get_user_role
 
 router = APIRouter()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)0.8s] %(message)s",
-)
-logger = logging.getLogger(__name__)
-
+"""
+write proper logging and exception handling
+"""
 
 def get_quicksight_data(lead_uuid, item):
     """
@@ -50,16 +46,16 @@ async def submit(file: Request, token: str = Depends(get_token)):
     body = json.loads(str(body, 'utf-8'))
 
     if 'lead_uuid' not in body or 'converted' not in body:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing required fields")
+        # throw proper HTTPException
+        pass
+        
     lead_uuid = body['lead_uuid']
     converted = body['converted']
 
     oem, role = get_user_role(token)
-    logger.info(f"Submit Lead conversion status: {oem}, {role} ")
     if role != "OEM":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Not Authorized")
+        # throw proper HTTPException
+        pass
 
     is_updated, item = db_helper_session.update_lead_conversion(lead_uuid, oem, converted)
     if is_updated:
@@ -70,6 +66,5 @@ async def submit(file: Request, token: str = Depends(get_token)):
             "message": "Lead Conversion Status Update"
         }
     else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Wrong UUID, Lead Doesn't exist")
+        # throw proper HTTPException
+        pass

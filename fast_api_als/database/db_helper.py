@@ -9,12 +9,12 @@ from datetime import datetime, timedelta
 
 from fast_api_als import constants
 from fast_api_als.utils.boto3_utils import get_boto3_session
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)0.8s] %(message)s",
-)
-logger = logging.getLogger(__name__)
+"""
+    the self.table.some_operation(), return a json object and you can find the http code of the executed operation as this :
+    res['ResponseMetadata']['HTTPStatusCode']
+    
+    write a commong function that logs this response code with appropriate context data
+"""
 
 
 class DBHelper:
@@ -32,8 +32,6 @@ class DBHelper:
         return geo_data_manager
 
     def insert_lead(self, lead_hash: str, lead_provider: str, response: str):
-        # logger.info(f"Inserting lead from {lead_provider} with response as {response}")
-        t1 = int(time.time() * 1000)
         item = {
             'pk': f'LEAD#{lead_hash}',
             'sk': lead_provider,
@@ -41,14 +39,10 @@ class DBHelper:
             'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.LEAD_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, f"{lead_provider}+'-'+{lead_hash}")
-        logger.info(
-            f"Inserted lead from {lead_provider} with response as {response} took: {int(time.time() * 1000) - t1}ms")
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
                         timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,
                         postalcode: str):
-        t1 = int(time.time() * 1000)
 
         item = {
             'pk': f"{make}#{uuid}",
@@ -70,9 +64,7 @@ class DBHelper:
             'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
 
-        response = self.table.put_item(Item=item)
-        verify_add_entry_response(response, f"{make}#{email}#{phone}#{last_name}")
-        logger.info(f"Inserted oem lead for {make} {model} took: {int(time.time() * 1000) - t1}ms")
+        res = self.table.put_item(Item=item)
 
     def check_duplicate_api_call(self, lead_hash: str, lead_provider: str):
         res = self.table.get_item(
@@ -103,6 +95,7 @@ class DBHelper:
             KeyConditionExpression=Key('gsipk').eq(f"{oem}#{date}")
                                    & Key('gsisk').begins_with("0#0")
         )
+
         return res.get('Items', [])
 
     def update_lead_sent_status(self, uuid: str, oem: str, make: str, model: str):
@@ -113,11 +106,9 @@ class DBHelper:
         )
         item = res['Item']
         if not item:
-            logger.info(f"No item found for {uuid}#{oem}#{make}#{model}")
             return False
         item['gsisk'] = "1#0"
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, f"{uuid}#{oem}#{make}#{model}")
         return True
 
     def get_make_model_filter_status(self, oem: str):
@@ -127,7 +118,6 @@ class DBHelper:
                 'sk': 'METADATA'
             }
         )
-        verify_add_entry_response(res, oem)
         if res['Item'].get('settings', {}).get('make_model', "False") == 'True':
             return True
         return False
@@ -161,7 +151,6 @@ class DBHelper:
                 'gsipk': apikey
             }
         )
-        verify_add_entry_response(res, username)
         return apikey
 
     def register_3PL(self, username: str):
@@ -177,7 +166,6 @@ class DBHelper:
         item = self.fetch_oem_data(oem)
         item['settings']['make_model'] = make_model
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem + make_model)
 
     def fetch_oem_data(self, oem, parallel=False):
         res = self.table.get_item(
@@ -206,7 +194,6 @@ class DBHelper:
                 'threshold': threshold
             }
         )
-        verify_add_entry_response(res, oem)
 
     def delete_oem(self, oem: str):
         res = self.table.delete_item(
@@ -215,7 +202,6 @@ class DBHelper:
                 'sk': "METADATA"
             }
         )
-        verify_add_entry_response(res, oem+"#Delete")
 
     def delete_3PL(self, username: str):
         authkey = self.get_auth_key(username)
@@ -226,7 +212,6 @@ class DBHelper:
                     'sk': authkey
                 }
             )
-            verify_add_entry_response(res, username)
 
     def set_oem_threshold(self, oem: str, threshold: str):
         item = self.fetch_oem_data(oem)
@@ -236,7 +221,6 @@ class DBHelper:
             }
         item['threshold'] = threshold
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, oem + threshold)
         return {
             "success": f"OEM {oem} threshold set to {threshold}"
         }
@@ -291,7 +275,6 @@ class DBHelper:
         }
 
     def insert_customer_lead(self, uuid: str, email: str, phone: str, last_name: str, make: str, model: str):
-        t1 = int(time.time() * 1000.0)
         item = {
             'pk': uuid,
             'sk': 'CUSTOMER_LEAD',
@@ -305,8 +288,6 @@ class DBHelper:
             'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, f"{uuid}#{email}#{phone}")
-        logger.info(f"inserted customer lead {uuid} took: {int(time.time() * 1000.0) - t1}ms")
 
     def lead_exists(self, uuid: str, make: str, model: str):
         lead_exist = False
@@ -338,7 +319,6 @@ class DBHelper:
         for item in customer_leads:
             if self.lead_exists(item['pk'], make, model):
                 return {"Duplicate_Lead": True}
-        logger.info(f"No duplicate lead for {email}#{phone}#{last_name}")
         return {"Duplicate_Lead": False}
 
     def get_api_key_author(self, apikey):
@@ -363,16 +343,14 @@ class DBHelper:
         item['conversion'] = converted
         item['gsisk'] = f"1#{converted}"
         res = self.table.put_item(Item=item)
-        verify_add_entry_response(res, item['pk'])
         return True, item
 
 
-def verify_add_entry_response(response, data):
-    status_code = response['ResponseMetadata']['HTTPStatusCode']
-    if not status_code == 200:
-        logger.error(f"Failed to add {data} to the database.")
+def verify_response(response_code):
+    if not response_code == 200:
+        pass
     else:
-        logger.info("New entry added successfully.")
+        pass
 
 
 session = get_boto3_session()

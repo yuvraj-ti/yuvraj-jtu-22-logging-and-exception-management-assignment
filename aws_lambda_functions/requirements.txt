@@ -1,5 +1,0 @@
-requests
-sagemaker
-boto3
-pandas
-numpy

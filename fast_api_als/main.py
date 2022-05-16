@@ -28,7 +28,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Trilogy Auto Lead Scoring"}
+    return {"message": "Welcome to jTU"}
 
 
 @app.get("/ping")
