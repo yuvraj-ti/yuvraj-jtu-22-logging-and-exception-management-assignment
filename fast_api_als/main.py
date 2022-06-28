@@ -33,6 +33,8 @@ def root():
 
 @app.get("/ping")
 def ping():
+    logging.info("ping function starts running")
     start = time.process_time()
     time_taken = (time.process_time() - start) * 1000
+    logging.info(f'pong with response time {time_taken} ms')
     return {f"Pong with response time {time_taken} ms"}
