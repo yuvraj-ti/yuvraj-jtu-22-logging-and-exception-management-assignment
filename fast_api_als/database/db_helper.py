@@ -16,6 +16,10 @@ from fast_api_als.utils.boto3_utils import get_boto3_session
     write a commong function that logs this response code with appropriate context data
 """
 
+logging.basicConfig(level = logging.INFO , format = '%(asctime)s : %(levelname)s : %(message)s')
+
+def log_HTTP_response_code(caller_fxn_data,res):
+    logging.info(f"{caller_fxn_data} returned http response code : {res['ResponseMetadata']['HTTPStatusCode']}")
 
 class DBHelper:
     def __init__(self, session: boto3.session.Session):
@@ -39,6 +43,7 @@ class DBHelper:
             'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.LEAD_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
+        log_HTTP_response_code(f'self.table.put_item in insert_lead', res)
 
     def insert_oem_lead(self, uuid: str, make: str, model: str, date: str, email: str, phone: str, last_name: str,
                         timestamp: str, make_model_filter_status: str, lead_hash: str, dealer: str, provider: str,
@@ -65,6 +70,7 @@ class DBHelper:
         }
 
         res = self.table.put_item(Item=item)
+        log_HTTP_response_code(f'self.table.put_item in insert_oem_lead', res)
 
     def check_duplicate_api_call(self, lead_hash: str, lead_provider: str):
         res = self.table.get_item(
@@ -73,6 +79,7 @@ class DBHelper:
                 'sk': lead_provider
             }
         )
+        log_HTTP_response_code(f'self.table.get_item in check_duplicate_api_call', res)
         item = res.get('Item')
         if not item:
             return {
@@ -96,6 +103,8 @@ class DBHelper:
                                    & Key('gsisk').begins_with("0#0")
         )
 
+        log_HTTP_response_code(f'self.table.query in accepted_lead_not_sent_for_oem', res)
+
         return res.get('Items', [])
 
     def update_lead_sent_status(self, uuid: str, oem: str, make: str, model: str):
@@ -104,11 +113,17 @@ class DBHelper:
                 'pk': f"{uuid}#{oem}"
             }
         )
+
+        log_HTTP_response_code(f'self.table.get_item in update_lead_sent_status', res)
+
         item = res['Item']
         if not item:
             return False
         item['gsisk'] = "1#0"
         res = self.table.put_item(Item=item)
+
+        log_HTTP_response_code(f'self.table.put_item in update_lead_sent_status', res)
+
         return True
 
     def get_make_model_filter_status(self, oem: str):
@@ -118,6 +133,8 @@ class DBHelper:
                 'sk': 'METADATA'
             }
         )
+        log_HTTP_response_code(f'self.table.get_item in get_make_model_filter_status', res)
+
         if res['Item'].get('settings', {}).get('make_model', "False") == 'True':
             return True
         return False
@@ -127,6 +144,8 @@ class DBHelper:
             IndexName='gsi-index',
             KeyConditionExpression=Key('gsipk').eq(apikey)
         )
+        log_HTTP_response_code(f'self.table.query in verify_api_key', res)
+
         item = res.get('Items', [])
         if len(item) == 0:
             return False
@@ -136,6 +155,8 @@ class DBHelper:
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(username)
         )
+        log_HTTP_response_code(f'self.table.query in get_auth_key', res)
+
         item = res['Items']
         if len(item) == 0:
             return None
@@ -151,12 +172,17 @@ class DBHelper:
                 'gsipk': apikey
             }
         )
+
+        log_HTTP_response_code(f'self.table.put_item in set_auth_key', res)
+
         return apikey
 
     def register_3PL(self, username: str):
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(username)
         )
+        log_HTTP_response_code(f'self.table.query in register_3PL', res)
+
         item = res.get('Items', [])
         if len(item):
             return None
@@ -166,6 +192,7 @@ class DBHelper:
         item = self.fetch_oem_data(oem)
         item['settings']['make_model'] = make_model
         res = self.table.put_item(Item=item)
+        log_HTTP_response_code(f'self.table.put_item in set_make_model_oem', res)
 
     def fetch_oem_data(self, oem, parallel=False):
         res = self.table.get_item(
@@ -174,6 +201,7 @@ class DBHelper:
                 'sk': "METADATA"
             }
         )
+        log_HTTP_response_code(f'self.table.get_item in fetch_oem_data', res)
         if 'Item' not in res:
             return {}
         if parallel:
@@ -194,6 +222,7 @@ class DBHelper:
                 'threshold': threshold
             }
         )
+        log_HTTP_response_code(f'self.table.put_item in create_new_oem', res)
 
     def delete_oem(self, oem: str):
         res = self.table.delete_item(
@@ -202,6 +231,7 @@ class DBHelper:
                 'sk': "METADATA"
             }
         )
+        log_HTTP_response_code(f'self.table.delete_item in delete_oem', res)
 
     def delete_3PL(self, username: str):
         authkey = self.get_auth_key(username)
@@ -212,6 +242,7 @@ class DBHelper:
                     'sk': authkey
                 }
             )
+            log_HTTP_response_code(f'self.table.delete_item in delete_3PL', res)
 
     def set_oem_threshold(self, oem: str, threshold: str):
         item = self.fetch_oem_data(oem)
@@ -221,6 +252,8 @@ class DBHelper:
             }
         item['threshold'] = threshold
         res = self.table.put_item(Item=item)
+        log_HTTP_response_code(f'self.table.put_item in set_oem_threshold', res)
+
         return {
             "success": f"OEM {oem} threshold set to {threshold}"
         }
@@ -288,6 +321,8 @@ class DBHelper:
             'ttl': datetime.fromtimestamp(int(time.time())) + timedelta(days=constants.OEM_ITEM_TTL)
         }
         res = self.table.put_item(Item=item)
+        log_HTTP_response_code(f'self.table.put_item in insert_customer_lead', res)
+
 
     def lead_exists(self, uuid: str, make: str, model: str):
         lead_exist = False
@@ -295,12 +330,16 @@ class DBHelper:
             res = self.table.query(
                 KeyConditionExpression=Key('pk').eq(f"{make}#{uuid}") & Key('sk').eq(f"{make}#{model}")
             )
+            log_HTTP_response_code(f'self.table.query in lead_exists', res)
+
             if len(res['Items']):
                 lead_exist = True
         else:
             res = self.table.query(
                 KeyConditionExpression=Key('pk').eq(f"{make}#{uuid}")
             )
+            log_HTTP_response_code(f'self.table.query in lead_exists', res)
+
             if len(res['Items']):
                 lead_exist = True
         return lead_exist
@@ -310,10 +349,14 @@ class DBHelper:
             IndexName='gsi-index',
             KeyConditionExpression=Key('gsipk').eq(email)
         )
+        log_HTTP_response_code(f'self.table.query in check_duplicate_lead', email_attached_leads)
+
         phone_attached_leads = self.table.query(
             IndexName='gsi1-index',
             KeyConditionExpression=Key('gsipk1').eq(f"{phone}#{last_name}")
         )
+        log_HTTP_response_code(f'self.table.query in check_duplicate_lead', phone_attached_leads)
+
         customer_leads = email_attached_leads['Items'] + phone_attached_leads['Items']
 
         for item in customer_leads:
@@ -326,6 +369,8 @@ class DBHelper:
             IndexName='gsi-index',
             KeyConditionExpression=Key('gsipk').eq(apikey)
         )
+        log_HTTP_response_code(f'self.table.query in get_api_key_author', res)
+
         item = res.get('Items', [])
         if len(item) == 0:
             return "unknown"
@@ -335,6 +380,8 @@ class DBHelper:
         res = self.table.query(
             KeyConditionExpression=Key('pk').eq(f"{oem}#{lead_uuid}")
         )
+        log_HTTP_response_code(f'self.table.query in update_lead_conversion', res)
+
         items = res.get('Items')
         if len(items) == 0:
             return False, {}
@@ -343,6 +390,8 @@ class DBHelper:
         item['conversion'] = converted
         item['gsisk'] = f"1#{converted}"
         res = self.table.put_item(Item=item)
+        log_HTTP_response_code(f'self.table.put_item in update_lead_conversion', res)
+       
         return True, item
 
 
