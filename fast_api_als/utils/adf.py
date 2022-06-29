@@ -4,6 +4,7 @@ import logging
 from uszipcode import SearchEngine
 import re
 
+logging.basicConfig(level = logging.INFO , format = '%(asctime)s : %(levelname)s : %(message)s')
 
 
 # ISO8601 datetime regex
@@ -39,8 +40,13 @@ def is_nan(x):
 
 def parse_xml(adf_xml):
     # use exception handling
-    obj = xmltodict.parse(adf_xml)
-    return obj
+    try:
+        obj = xmltodict.parse(adf_xml)
+    except Exception as e:
+        logging.error(f'adf.py -> parse_xml : Error {e} in parsing the adf_xml')
+        raise Exception("Error in parsing the adf_xml")
+    else:
+        return obj
 
 
 def validate_adf_values(input_json):
