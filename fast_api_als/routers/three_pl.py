@@ -18,9 +18,13 @@ async def reset_authkey(request: Request, token: str = Depends(get_token)):
     provider, role = get_user_role(token)
     if role != "ADMIN" and (role != "3PL"):
         pass
+        logging.info("'unauthorized user i.e user's role!='3PL' and role!='ADMIN' ' in reset_authkey function in three_pl.py")
+        raise HTTPException(401,detail="user is unauthorized")
+
     if role == "ADMIN":
         provider = body['3pl']
     apikey = db_helper_session.set_auth_key(username=provider)
+
     return {
         "status_code": HTTP_200_OK,
         "x-api-key": apikey
@@ -35,6 +39,9 @@ async def view_authkey(request: Request, token: str = Depends(get_token)):
 
     if role != "ADMIN" and role != "3PL":
         pass
+        logging.info("'unauthorized user i.e user's role!='3PL' and role!='ADMIN' ' in reset_authkey function in three_pl.py")
+        raise HTTPException(401,detail="user is unauthorized")
+
     if role == "ADMIN":
         provider = body['3pl']
     apikey = db_helper_session.get_auth_key(username=provider)
